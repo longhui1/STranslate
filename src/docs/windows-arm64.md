@@ -80,7 +80,7 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 
 上述主程序编译检查使用已有 helper 文件路径作为构建输入，**不是完整可交付包**；它不能替代完整 ARM64 helper、Setup 和元数据的发布校验。验证器的合成 fixture 检查也不是实际 Setup 构建证据。完整 Windows 构建与发布结果应以 workflow 成功产物为准。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实 OTA。
 
-当前交付阻塞：Git 推送和 GitHub 连接器创建分支均返回 HTTP 403，后者明确返回 `Resource not accessible by integration`。因此本阶段尚未触发 Windows CI、生成完整 Setup 或上传 Release；这里没有可用 Setup 下载地址。需要为此 fork 提供能够提交 workflow 的 GitHub 写入访问，并启用 Actions，随后运行上面的完整流程。不要把编译检查目录上传为正式 ARM64 发行版。
+MSVC 的 ARM64 开发环境会设置 `Platform=arm64`，因此 workflow 中运行 x64 测试时显式传入 `Platform=AnyCPU`，避免 .NET SDK 将测试程序集也判定为 ARM64。主程序发布同样显式设置 AnyCPU，原生进程架构由 `win-arm64` apphost 和运行时决定。不要把未经完整架构和安装包校验的编译目录上传为正式 ARM64 发行版。
 
 真实 Windows ARM64 设备需验证：
 

@@ -112,7 +112,7 @@ jobs:
       - name: Verify update and plugin policies
         shell: pwsh
         run: |
-          dotnet test src/Tests/STranslate.Tests/STranslate.Tests.csproj -c Release -r win-x64 -p:DisableFody=true --filter 'FullyQualifiedName~UpdateFeedPolicyTests|FullyQualifiedName~PluginPlatformCompatibilityTests'
+          dotnet test src/Tests/STranslate.Tests/STranslate.Tests.csproj -c Release -r win-x64 -p:Platform=AnyCPU -p:DisableFody=true --filter 'FullyQualifiedName~UpdateFeedPolicyTests|FullyQualifiedName~PluginPlatformCompatibilityTests'
           if ($LASTEXITCODE -ne 0) { throw '更新源及插件兼容性测试失败。' }
       - name: Build native ARM64 installer and update feed
         shell: pwsh
