@@ -8,9 +8,10 @@ ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack O
 
 ## 第一阶段下载与实机 OTA
 
-- 直接使用：[最新 ARM64 Setup（2.0.10-arm64.2）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.2/STranslate-ARM64-win-arm64-Setup.exe)。
-- 完整资产、更新元数据和校验文件：[ARM64 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.2)。
-- 测试 OTA：[先安装首版 Setup（2.0.10-arm64.1）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.1/STranslate-ARM64-win-arm64-Setup.exe)，配置 DeepL / MiMo 并产生历史记录，然后从关于页面检查更新至 `2.0.10-arm64.2`；确认退出、替换、重启和数据保留。无需重新运行新版 Setup。
+- 直接使用：[最新 ARM64 Setup（2.0.10-arm64.3）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.3/STranslate-ARM64-win-arm64-Setup.exe)。
+- 完整资产、更新元数据和校验文件：[ARM64 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.3)。
+- `arm64.1` / `arm64.2` 的更新检查使用匿名 GitHub API。实机已报告 `403 rate limit exceeded`，发生在发现新版本之前。如果旧版仍被限额阻断，先退出程序并运行本版 Setup 覆盖安装一次；`arm64.3` 起检查与下载不再调用 GitHub Release API，无需个人 token。安装身份、目录和配置路径不变，设备上需确认数据保留。
+- 测试后续 OTA：保留安装 `arm64.3` 的设备，配置 DeepL / MiMo 并产生历史记录，从关于页面更新到下一次更高版本，确认退出、替换、重启和数据保留。旧版 API 恢复后也可升级到本版；不能要求仍被限流的旧检查器自行修复。
 
 安装包未代码签名，Windows 可能提示发布者未知。运行和功能验证清单见本文末尾；云端的构建与包校验不能代替这些设备验证。
 
@@ -21,13 +22,16 @@ ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack O
 | 主程序 RID | `win-arm64`，自包含 | 用户无需预装 .NET，随包包含 ARM64 .NET / WPF |
 | Velopack package ID | `STranslate-ARM64` | 与官方 `STranslate` 的安装位置、包身份区分 |
 | 更新仓库 | `https://github.com/longhui1/STranslate` | 固定使用 fork 的 ARM64 Release |
+| 更新 feed | `https://github.com/longhui1/STranslate/releases/latest/download/releases.win-arm64.json` | 公开文件入口，免 GitHub API / token |
 | 更新 channel | `win-arm64` | 只读取 `releases.win-arm64.json`，不回退 `releases.win.json` |
 | Git tag | `arm64-v2.0.10-arm64.1` | 触发独立 ARM64 发布 workflow |
 | GitHub Release | 稳定、已发布，非 draft / prerelease | 保持现有稳定更新通道的筛选行为 |
 
 `UpdateFeedPolicy` 按**进程架构**选择源：原生 ARM64 进程固定使用上述仓库与显式 channel；官方 x64 进程即使运行在 ARM64 Windows 上，也保持上游更新规则。源不存入用户设置，迁移旧配置无法将 ARM64 改回官方 x64 更新源。已有手动更新、后台通知、下载、退出后替换与重启流程不变。ARM64 更新日志来自打包时的发行说明，避免显示另一发行版的日志。
 
-Velopack 的 GitHub source 只读取最近 10 个 Release，所以这个 fork 的发布应以 ARM64 为主；不要连续发布大量不含 ARM64 元数据的其他发行版。必须保留最新稳定 ARM64 feed 及其引用的全量包，它允许任意较旧 ARM64 安装直接升级；历史 Release 和包建议保留，用于 delta 基准、回溯与设备验证。channel 不是二进制架构校验：构建流程还必须检查元数据身份、原生 PE 和实际包内容。
+ARM64 从 `arm64.3` 起复用 Velopack `SimpleWebSource` 读取 latest 正式 Release 的公开 feed，不通过 GitHub API 枚举发行版。一个小型子类仅将包下载固定到 `arm64-v{Version}` tag，保留默认下载器、超时、进度和取消行为，避免用户确认期间 latest 变更导致目标包丢失；x64 仍使用上游 `GithubSource`。
+
+本仓库的 latest 正式 Release 必须含 ARM64 feed 及其引用的全量 / delta 包；缺少 feed 时检查失败，不回退到 x64。不要让仅含其他架构的 Release 成为 latest。最新全量包允许较旧 ARM64 安装直接升级；历史 tag 和更新包应保持可下载且不可变，用于已选中目标的下载、delta 基准、回溯与设备验证。channel 不是二进制架构校验：构建流程还必须检查元数据身份、原生 PE 和实际包内容。
 
 独立安装标识允许与 x64 安装共存，但上游用户配置目录仍可能共享。第一轮安装建议先退出 x64 版本并备份配置；单实例、计划任务及旧快捷方式迁移需要在设备上验证。此阶段不自动卸载旧 x64 安装，不创建第二套插件市场。
 
@@ -76,18 +80,18 @@ git push origin arm64-v2.0.11-arm64.1
 
 存在 delta 时，发布前还会用同版本 `vpk delta patch` 从上一版 full 实际重建新包，并逐文件比较 ZIP 路径、长度和 SHA-256；生成的 `arm64-delta-validation.json` 记录输入包哈希和结果。重建 ZIP 的压缩字节可能与原 full 不同，因此不能比较整个 ZIP 的哈希代替内容检查。此检查在 Windows CI 中运行，涵盖 Windows MSDelta 格式；它证明增量包内容可重建，不能代替 ARM64 `Update.exe` 在设备上的退出替换和重启验证。
 
-发布后应直接下载公开 feed，确认其中 `PackageId`、版本、包名、哈希与 Release 资产一致。最新版设备无更新可用是正常状态；必须保留一台安装旧 ARM64 版本的设备，用下一次更高版本实际验证 OTA，不能把模拟 feed 测试写成真实重启升级验证。首次交付保留 [首版 Setup](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.1/STranslate-ARM64-win-arm64-Setup.exe)，可先安装 `2.0.10-arm64.1`，添加 DeepL / MiMo 和历史记录，再从关于页面检查更新到后续修订，确认数据保留并仍为 ARM64。
+发布后应直接下载公开 feed，确认其中 `PackageId`、版本、包名、哈希与 Release 资产一致。最新版设备无更新可用是正常状态；必须保留一台安装旧 ARM64 版本的设备，用下一次更高版本实际验证 OTA，不能把模拟 feed 测试写成真实重启升级验证。保留历史 Setup 用于回归；后续 OTA 验证优先使用 `arm64.3` 或更高版本作为起点，添加 DeepL / MiMo 和历史记录后升级。`arm64.1` / `arm64.2` 的检查仍可能受到 GitHub API 限流，不能将该环境前提忽略。
 
 ## 必要修改清单
 
 | 修改 | 原因与同步注意事项 |
 | --- | --- |
 | 主 csproj 条件 RID 和 helper 路径 | 默认 x64 保留；ARM64 构建从 Rust target 目录取 helper，不拷贝 Resources 中的 x64 EXE |
-| `UpdateFeedPolicy` 和更新服务 | 按 ARM64 进程固定 fork / channel，版本比较以 Velopack 安装版本为准 |
+| `UpdateFeedPolicy` 和更新服务 | 按 ARM64 进程固定 fork / channel；公开 latest feed 绕开匿名 API 限额，包下载固定版本 tag；版本比较以 Velopack 安装版本为准 |
 | 更新日志对话框的可选发行说明 | ARM64 展示同一包的日志；x64 继续使用原日志地址 |
 | `PluginManager` 微信稳定 ID 拒绝规则 | 避免旧配置 / 本地导入重新加载已知不兼容的 native 插件 |
 | 独立 ARM64 构建、验证脚本和 workflow | 与上游 x64 脚本隔离，锁定工具、源码和渠道；原 workflow 只增加 ARM64 事件隔离 |
-| 12 个更新 / 插件策略回归测试 | 检查无 x64 回退、稳定版本筛选、ARM64 修订升级、上游升级后修订重置、无降级及 MiMo 允许加载 |
+| 更新 / 插件策略回归测试 | 检查 API 403 时 ARM64 零 API 调用、无 x64 回退、固定 tag 下载、取消 / 进度传递、版本递增与 MiMo 允许加载；x64 原更新行为保持 |
 
 无需修改 DeepL、MiMo、ScreenGrab、NAudio 或 Rust helper 的功能源码。详细证据见 [插件审计](arm64-plugin-compatibility.md) 和 [原生依赖审计](arm64-native-dependencies.md)。同步上游后保留这几个小型补丁，重新运行 workflow；若上游调整插件 manifest / SDK、native 依赖、helper 命令或 Velopack，应重新审核对应边界。
 
@@ -100,6 +104,8 @@ git push origin arm64-v2.0.11-arm64.1
 首个 [公开 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.1) 已由 [正式发布 CI](https://github.com/longhui1/STranslate/actions/runs/37492362805) 成功生成并公开，包含 Setup、全量 `.nupkg`、`releases.win-arm64.json`、校验文件和 Velopack 原生组件来源记录。公开 feed 已确认包身份 `STranslate-ARM64` 与 `win-arm64` 通道一致。
 
 第二个 [公开 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.2) 由 [同一发布流程](https://github.com/longhui1/STranslate/actions/runs/37493813424) 再次成功生成，包含全量包和 `475499` 字节的 delta，并保留与第一版 SHA-256 完全相同的基准 full。Windows CI 用真实 `vpk delta patch` 重建后，1135 个文件的路径、解压长度和 SHA-256 全部一致；[公开重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.2/arm64-delta-validation.json) 记录包哈希与验证边界。两版公开下载的 Setup / 更新包 / feed 均已独立核对大小与 SHA-1 / SHA-256，关键 native PE 确认为 ARM64。使用原始公开 GitHub API / feed 和实际第一版 full 离线回放真实 Velopack 的 3 项检查也通过：第一版选中新版及 delta、最新版无更新、缺少本地基准时可使用 full OTA。这些验证没有执行 ARM64 Update.exe 或真实设备重启。
+
+`arm64.3` 的更新源修复在本地使用真实 Velopack 1.2.0 通过 19 个更新策略测试：模拟 GitHub API 恒返回 403 时 ARM64 仍可发现更新且零 API 调用；latest 缺 ARM64 feed 时失败且无 x64 回退；full / delta 下载固定到选中版本 tag；参数传递、版本排序与 x64 原行为保持。正式 Windows 构建结果需以本版 workflow 为准。
 
 完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
 
