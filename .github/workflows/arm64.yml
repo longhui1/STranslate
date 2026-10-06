@@ -1,0 +1,150 @@
+name: Windows ARM64
+
+on:
+  push:
+    branches: [arm64, 'arm64/**', 'codex/windows-arm64']
+    tags: ['arm64-v*']
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'build-arm64.ps1'
+      - 'scripts/**'
+      - '.config/dotnet-tools.json'
+      - '.github/workflows/arm64.yml'
+      - 'ARM64-RELEASE.md'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'ARM64 版本（三段或四段数字，发布后只能递增）'
+        required: true
+        default: '2.0.10.1'
+      publish:
+        description: '发布正式 ARM64 GitHub Release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arm64-${{ (startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true) && 'release' || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+      - name: Resolve ARM64 version
+        id: version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $env:GITHUB_REF_NAME -replace '^arm64-v', ''
+          } elseif ($env:INPUT_VERSION) {
+            $env:INPUT_VERSION
+          } else {
+            '2.0.10.1'
+          }
+          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(\.[1-9]\d*)?$') {
+            throw 'ARM64 版本必须是无前导零的三段或四段数字；末段为 0 时使用三段。'
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=arm64-v$version" >> $env:GITHUB_OUTPUT
+      - name: Require a new ARM64 release version
+        if: startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARM64_VERSION: ${{ steps.version.outputs.version }}
+          ARM64_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if ($env:GITHUB_REPOSITORY -ne 'longhui1/STranslate') {
+            throw '本构建的 ARM64 更新源固定为 longhui1/STranslate；发布到其他仓库前请同步修改更新策略。'
+          }
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+          $api = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY"
+          $existing = $null
+          try {
+            $existing = Invoke-RestMethod "$api/releases/tags/$env:ARM64_TAG" -Headers $headers
+          } catch {
+            if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+          }
+          if ($existing -and -not $existing.draft) { throw '此 ARM64 Release 已发布；OTA 资源不能覆写，请递增版本。' }
+          $currentVersion = if ($env:ARM64_VERSION.Split('.').Count -eq 3) { [version]"$env:ARM64_VERSION.0" } else { [version]$env:ARM64_VERSION }
+          $page = 1
+          do {
+            $releases = @(Invoke-RestMethod "$api/releases?per_page=100&page=$page" -Headers $headers)
+            foreach ($release in $releases) {
+              if (-not $release.draft -and -not $release.prerelease -and $release.tag_name -match '^arm64-v(\d+\.\d+\.\d+(\.\d+)?)$') {
+                $remoteVersion = $Matches[1]
+                $remoteComparable = if ($remoteVersion.Split('.').Count -eq 3) { [version]"$remoteVersion.0" } else { [version]$remoteVersion }
+                if ($remoteComparable -ge $currentVersion) {
+                  throw "新版本必须高于已发布 ARM64 版本 $($release.tag_name)。"
+                }
+                $feedAsset = $release.assets | Where-Object name -EQ 'releases.win-arm64.json' | Select-Object -First 1
+                if ($feedAsset) {
+                  $feed = Invoke-RestMethod $feedAsset.browser_download_url
+                  foreach ($asset in $feed.Assets) {
+                    $feedVersion = [string]$asset.Version
+                    $feedComparable = if ($feedVersion.Split('.').Count -eq 3) { [version]"$feedVersion.0" } else { [version]$feedVersion }
+                    if ($feedComparable -ge $currentVersion) {
+                      throw "新版本必须高于已发布 ARM64 更新 feed 中的版本 $feedVersion。"
+                    }
+                  }
+                }
+              }
+            }
+            $page++
+          } while ($releases.Count -eq 100)
+      - name: Verify update and plugin policies
+        shell: pwsh
+        run: |
+          dotnet test src/Tests/STranslate.Tests/STranslate.Tests.csproj -c Release -r win-x64 -p:DisableFody=true --filter 'FullyQualifiedName~UpdateFeedPolicyTests|FullyQualifiedName~PluginPlatformCompatibilityTests'
+          if ($LASTEXITCODE -ne 0) { throw '更新源及插件兼容性测试失败。' }
+      - name: Build native ARM64 installer and update feed
+        shell: pwsh
+        env:
+          ARM64_VERSION: ${{ steps.version.outputs.version }}
+        run: ./build-arm64.ps1 -Version $env:ARM64_VERSION -DownloadPrevious
+      - name: Upload ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: STranslate-arm64-${{ steps.version.outputs.version }}
+          path: publish/arm64/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload complete ARM64 Release as draft
+        if: startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: STranslate ARM64 ${{ steps.version.outputs.version }}
+          body_path: ARM64-RELEASE.md
+          draft: true
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: publish/arm64/*
+      - name: Publish complete ARM64 Release
+        if: startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARM64_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release edit $env:ARM64_TAG --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'ARM64 资源已经上传为草稿，但正式发布失败。' }

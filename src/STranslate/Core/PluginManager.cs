@@ -4,12 +4,15 @@ using STranslate.Plugin;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace STranslate.Core;
 
 public class PluginManager : IDisposable
 {
+    private const string WeChatOcrPluginId = "3410e7de989340938301abd6fcf8cc4b";
+    private const string UnsupportedWeChatOcrMessage = "微信内置 OCR 不支持原生 Windows ARM64，此版本已禁用该插件。";
     private readonly ILogger<PluginManager> _logger;
     private readonly List<PluginMetaData> _pluginMetaDatas;
     private readonly string _tempExtractPath;
@@ -82,6 +85,13 @@ public class PluginManager : IDisposable
                 var message = "Invalid plugin structure: " + JsonSerializer.Serialize(metaData);
                 _logger.LogError(message);
                 return PluginInstallResult.Fail(message);
+            }
+
+            if (!IsPluginSupported(metaData.PluginID, RuntimeInformation.ProcessArchitecture))
+            {
+                isError = true;
+                _logger.LogWarning("{PluginName}: {Message}", metaData.Name, UnsupportedWeChatOcrMessage);
+                return PluginInstallResult.Fail(UnsupportedWeChatOcrMessage);
             }
 
             var existPluginMetaData = _pluginMetaDatas.FirstOrDefault(x => x.PluginID == metaData.PluginID);
@@ -221,6 +231,12 @@ public class PluginManager : IDisposable
         var results = new List<PluginLoadResult>();
         foreach (var metaData in uniqueList)
         {
+            if (!IsPluginSupported(metaData.PluginID, RuntimeInformation.ProcessArchitecture))
+            {
+                _logger.LogWarning("跳过插件 {PluginName}: {Message}", metaData.Name, UnsupportedWeChatOcrMessage);
+                continue;
+            }
+
             var result = LoadPluginPairFromMetaData(metaData);
             results.Add(result);
         }
@@ -229,6 +245,11 @@ public class PluginManager : IDisposable
 
         return results;
     }
+
+    // 按进程架构判断，保留官方 x64 进程在 Windows on ARM 上的既有行为。
+    internal static bool IsPluginSupported(string pluginId, Architecture processArchitecture)
+        => processArchitecture != Architecture.Arm64 ||
+           !string.Equals(pluginId, WeChatOcrPluginId, StringComparison.OrdinalIgnoreCase);
 
     private PluginLoadResult LoadPluginPairFromMetaData(PluginMetaData metaData)
     {

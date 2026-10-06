@@ -17,8 +17,10 @@
   - `HttpListener` 本地服务，路由外部请求到主窗口命令。
 - `STranslate/Core/UpdaterService.cs`
   - 手动检查更新、后台轮询检查与升级应用流程。
+- `STranslate/Core/UpdateFeedPolicy.cs`
+  - 按进程架构选择固定更新源和 channel。
 - `STranslate/Controls/UpdateChangelogDialog.xaml(.cs)`
-  - 手动更新确认弹窗：加载并渲染远程 `CHANGELOG.md`，失败时回退外链。
+  - 手动更新确认弹窗：渲染 ARM64 安装包日志或上游远程 `CHANGELOG.md`，失败时回退外链。
 - `STranslate/Core/AutoUpdateCheckerService.cs`
   - 自动检查更新调度（首次延迟 + 固定轮询间隔 + 开关判定）。
 - `STranslate/Services/BackupService.cs`
@@ -50,10 +52,14 @@
 
 ### 从入口到结果：应用更新（手动）
 1. `UpdaterService.UpdateAppAsync()` 使用 `UpdateLock` 防止并发更新。
-2. 通过 Velopack `GithubSource` 检查新版本。
+2. 通过 Velopack `GithubSource` 检查新版本：
+   - ARM64 进程固定使用 `https://github.com/longhui1/STranslate` 和 `win-arm64` channel；即使安装元数据记录旧 channel，也显式覆盖。没有 ARM64 feed 时不会回退到上游或 x64 feed。
+   - 其他架构沿用上游仓库与安装包自身的 channel。
+   - 只接受已发布的稳定 GitHub Release，不包含草稿和预发布；以 Velopack 安装版本比较，支持第四段 ARM64 修订号，例如 `2.0.10.1` → `2.0.10.2`。
+   - 更新源不写入用户设置，恢复旧配置或从 x64 迁移配置不会改变 ARM64 更新源。
 3. 非静默检查时弹出 `UpdateChangelogDialog`：
    - 默认先显示加载动画（`ProgressRing`）。
-   - 通过 `IHttpService` 拉取 `https://raw.githubusercontent.com/STranslate/STranslate/refs/heads/main/CHANGELOG.md` 并用 `MarkdownViewer` 渲染完整更新内容。
+   - ARM64 使用目标安装包 feed 中的 `NotesMarkdown`；缺少日志时显示 fork Release 页面链接。其他架构通过 `IHttpService` 拉取 `https://raw.githubusercontent.com/STranslate/STranslate/refs/heads/main/CHANGELOG.md` 并用 `MarkdownViewer` 渲染完整更新内容。
    - 加载失败时显示可点击外链回退文案，用户可在浏览器查看完整更新日志。
 4. 用户点击“下载”后继续下载更新；取消则终止本次更新流程。
 5. 便携模式下先把便携目录复制到临时目录，避免覆盖丢失配置。
@@ -100,6 +106,7 @@
 - `STranslate/ViewModels/Pages/NetworkViewModel.cs`
 - `STranslate/Core/ExternalCallService.cs`
 - `STranslate/Core/UpdaterService.cs`
+- `STranslate/Core/UpdateFeedPolicy.cs`
 - `STranslate/Controls/UpdateChangelogDialog.xaml`
 - `STranslate/Controls/UpdateChangelogDialog.xaml.cs`
 - `STranslate/Core/AutoUpdateCheckerService.cs`
@@ -109,7 +116,7 @@
 ## 常见改动任务
 - 新增外部调用路径：在 `ExternalCallAction` 增加枚举，并在 `ExecuteExternalCall()` 添加分支。
 - 新增会显示窗口的外部调用：复用 `MainWindowViewModel` 或 `SingletonWindowOpener` 的现有入口，并确保异步命令被等待；强制置前由外部调用上下文统一继承，不在 action 分支中直接操作窗口线程。
-- 更换更新源或策略：修改 `UpdaterService` 的 `UpdateManager` 源与版本判定逻辑。
+- 更换更新源或 channel：修改 `UpdateFeedPolicy`。ARM64 发布流程必须保持 `win-arm64` channel，上传同一 Release 的 `releases.win-arm64.json` 与它引用的完整更新包，并保持版本递增；`UpdaterService` 的手动与后台检查共用此策略。
 - 调整自动检查频率：修改 `AutoUpdateCheckerService` 的轮询间隔常量。
 - 下载链路优化：优先扩展 `HttpService.DownloadFileAsync()`，保证进度、取消、异常统一。
 - 流式请求改造：优先扩展 `StreamPostAsync()` 与 `StreamPostAsyncEnumerable()` 的共同读取语义，确保取消、空行过滤和错误处理一致。

@@ -11,9 +11,11 @@ on:
   push:
     tags:
       - "*" # Push events to matching *, i.e. 1.0, 20.15.10
+      - "!arm64-v*"
 
 jobs:
   build:
+    if: github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'arm64-v')
     runs-on: windows-latest # 添加EnableWindowsTargeting可支持跨平台编译WPF项目
 
     steps:

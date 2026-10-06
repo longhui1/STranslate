@@ -8,7 +8,9 @@
         <UseWPF>true</UseWPF>
         <StartupObject>STranslate.App</StartupObject>
         <!--// Avoid generating redundant assembly attributes //-->
-        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+        <STranslateHostPath Condition="'$(STranslateHostPath)' == '' and '$(RuntimeIdentifier)' == 'win-arm64'">..\STranslate.Host\target\aarch64-pc-windows-msvc\release\z_stranslate_host.exe</STranslateHostPath>
+        <STranslateHostPath Condition="'$(STranslateHostPath)' == ''">Resources\z_stranslate_host.exe</STranslateHostPath>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <ApplicationIcon>Resources\app.ico</ApplicationIcon>
         <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -75,8 +77,9 @@
         <Content Include="Images\*.*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
-        <Content Include="Resources\z_stranslate_host.exe">
+        <Content Include="$(STranslateHostPath)">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
             <TargetPath>z_stranslate_host.exe</TargetPath>
         </Content>
     </ItemGroup>

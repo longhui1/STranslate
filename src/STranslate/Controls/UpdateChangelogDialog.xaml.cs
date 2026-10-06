@@ -20,6 +20,8 @@ public partial class UpdateChangelogDialog : ContentDialog, INotifyPropertyChang
     private readonly ILogger<UpdateChangelogDialog> _logger = Ioc.Default.GetRequiredService<ILogger<UpdateChangelogDialog>>();
     private readonly Internationalization _i18n = Ioc.Default.GetRequiredService<Internationalization>();
     private readonly IHttpService _httpService = Ioc.Default.GetRequiredService<IHttpService>();
+    private readonly string? _releaseNotesMarkdown;
+    private readonly string? _releasePageUrl;
 
     private string _headerText = string.Empty;
     private bool _isLoading = true;
@@ -29,10 +31,14 @@ public partial class UpdateChangelogDialog : ContentDialog, INotifyPropertyChang
     /// 初始化更新日志对话框。
     /// </summary>
     /// <param name="newVersion">检测到的新版本号。</param>
-    public UpdateChangelogDialog(string newVersion)
+    /// <param name="releaseNotesMarkdown">独立发布源的安装包更新日志。</param>
+    /// <param name="releasePageUrl">独立发布源的更新日志回退链接；为空时沿用上游更新日志。</param>
+    public UpdateChangelogDialog(string newVersion, string? releaseNotesMarkdown = null, string? releasePageUrl = null)
     {
         InitializeComponent();
         DataContext = this;
+        _releaseNotesMarkdown = releaseNotesMarkdown;
+        _releasePageUrl = releasePageUrl;
 
         HeaderText = string.Format(_i18n.GetTranslation("NewVersionFound"), newVersion);
         Loaded += OnLoaded;
@@ -109,7 +115,9 @@ public partial class UpdateChangelogDialog : ContentDialog, INotifyPropertyChang
     private async Task LoadChangelogAsync()
     {
         IsLoading = true;
-        var changelogContent = await TryGetChangelogAsync();
+        var changelogContent = _releasePageUrl is null
+            ? await TryGetChangelogAsync()
+            : _releaseNotesMarkdown;
         MarkdownContent = string.IsNullOrWhiteSpace(changelogContent)
             ? BuildFallbackMarkdown()
             : changelogContent;
@@ -139,7 +147,7 @@ public partial class UpdateChangelogDialog : ContentDialog, INotifyPropertyChang
     /// </summary>
     /// <returns>包含可点击链接的提示 Markdown。</returns>
     private string BuildFallbackMarkdown()
-        => string.Format(_i18n.GetTranslation("UpdateChangelogLoadFailedMarkdown"), ChangelogUrl);
+        => string.Format(_i18n.GetTranslation("UpdateChangelogLoadFailedMarkdown"), _releasePageUrl ?? ChangelogUrl);
 
     private void OpenHyperlink(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
     {

@@ -10,8 +10,6 @@ using System.Text.Json;
 using System.Windows;
 using STranslate.Views;
 using STranslate.Views.Pages;
-using Velopack;
-using Velopack.Sources;
 
 namespace STranslate.Core;
 
@@ -36,7 +34,8 @@ public class UpdaterService(
         {
             notification.Show(i18n.GetTranslation("UpdateCheck"), i18n.GetTranslation("CheckingForUpdates"));
 
-            var updateManager = new UpdateManager(new GithubSource(Constant.Github, accessToken: default, prerelease: false));
+            var updateFeed = UpdateFeedPolicy.Current;
+            var updateManager = updateFeed.CreateUpdateManager();
 
             var newUpdateInfo = await updateManager.CheckForUpdatesAsync();
 
@@ -47,8 +46,9 @@ public class UpdaterService(
                 return;
             }
 
-            var newReleaseVersion = SemanticVersioning.Version.Parse(newUpdateInfo.TargetFullRelease.Version.ToString());
-            var currentVersion = SemanticVersioning.Version.Parse(Constant.Version);
+            var newReleaseVersion = newUpdateInfo.TargetFullRelease.Version;
+            // 以安装包版本为准；Velopack 同时支持 ARM64 发布使用的第四段修订号。
+            var currentVersion = updateManager.CurrentVersion!;
 
             logger.LogInformation($"Future Release <{JsonSerializer.Serialize(newUpdateInfo.TargetFullRelease)}>");
 
@@ -59,7 +59,8 @@ public class UpdaterService(
                 return;
             }
 
-            var dialogResult = await new UpdateChangelogDialog(newReleaseVersion.ToString()).ShowAsync();
+            var dialogResult = await new UpdateChangelogDialog(newReleaseVersion.ToString(),
+                newUpdateInfo.TargetFullRelease.NotesMarkdown, updateFeed.ReleaseNotesUrl).ShowAsync();
             if (dialogResult != ContentDialogResult.Primary)
             {
                 logger.LogInformation("User cancelled the update.");
@@ -116,7 +117,7 @@ public class UpdaterService(
         await UpdateLock.WaitAsync();
         try
         {
-            var updateManager = new UpdateManager(new GithubSource(Constant.Github, accessToken: default, prerelease: false));
+            var updateManager = UpdateFeedPolicy.Current.CreateUpdateManager();
             var newUpdateInfo = await updateManager.CheckForUpdatesAsync();
 
             if (newUpdateInfo == null)
@@ -125,8 +126,8 @@ public class UpdaterService(
                 return false;
             }
 
-            var newReleaseVersion = SemanticVersioning.Version.Parse(newUpdateInfo.TargetFullRelease.Version.ToString());
-            var currentVersion = SemanticVersioning.Version.Parse(Constant.Version);
+            var newReleaseVersion = newUpdateInfo.TargetFullRelease.Version;
+            var currentVersion = updateManager.CurrentVersion!;
             logger.LogInformation($"Future Release <{JsonSerializer.Serialize(newUpdateInfo.TargetFullRelease)}>");
 
             if (newReleaseVersion <= currentVersion)
