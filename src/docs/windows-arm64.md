@@ -105,7 +105,9 @@ git push origin arm64-v2.0.11-arm64.1
 
 第二个 [公开 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.2) 由 [同一发布流程](https://github.com/longhui1/STranslate/actions/runs/37493813424) 再次成功生成，包含全量包和 `475499` 字节的 delta，并保留与第一版 SHA-256 完全相同的基准 full。Windows CI 用真实 `vpk delta patch` 重建后，1135 个文件的路径、解压长度和 SHA-256 全部一致；[公开重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.2/arm64-delta-validation.json) 记录包哈希与验证边界。两版公开下载的 Setup / 更新包 / feed 均已独立核对大小与 SHA-1 / SHA-256，关键 native PE 确认为 ARM64。使用原始公开 GitHub API / feed 和实际第一版 full 离线回放真实 Velopack 的 3 项检查也通过：第一版选中新版及 delta、最新版无更新、缺少本地基准时可使用 full OTA。这些验证没有执行 ARM64 Update.exe 或真实设备重启。
 
-`arm64.3` 的更新源修复在本地使用真实 Velopack 1.2.0 通过 19 个更新策略测试：模拟 GitHub API 恒返回 403 时 ARM64 仍可发现更新且零 API 调用；latest 缺 ARM64 feed 时失败且无 x64 回退；full / delta 下载固定到选中版本 tag；参数传递、版本排序与 x64 原行为保持。正式 Windows 构建结果需以本版 workflow 为准。
+第三个 [公开 Release（arm64.3）](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.3) 的 [Windows 发布 CI](https://github.com/longhui1/STranslate/actions/runs/37499748393) 已成功完成。修复实机报告的 GitHub 匿名 API `403 rate limit exceeded`，19 个更新策略测试覆盖零 API 检查、缺 feed 不回退、固定 tag 下载与参数传递；插件策略继续检查微信拒绝和 MiMo 允许。公开下载的 Setup、full、delta、feed 和来源记录已独立校验 SHA-256，feed 包同时核对大小和 SHA-1；Setup 确认为原生 ARM64，全量包程序树的 700 个 PE 与 20 个内置插件再次通过校验，包内程序集包含新的静态 feed / 固定 tag 实现。
+
+本版保留上一版 full，delta 为 `681090` 字节。Windows CI 的 [真实 delta 重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.3/arm64-delta-validation.json) 确认 1135 个文件的路径、长度和 SHA-256 一致。最新公开 feed 回放的 3 项真实 Velopack 检查通过：上一版真实 full 选中本版 delta、本版无更新、首版没有本地基准时选中本版 full；全过程零 GitHub API 调用。另用未修改的 Velopack 默认 `HttpClientFileDownloader` 实际读取公开 latest feed，从固定 `arm64-v2.0.10-arm64.3` tag 下载 delta 并核对 SHA-256，无 token、无自定义 TLS / HTTP handler。这些云端检查没有执行 ARM64 Update.exe 或实机覆盖安装、退出替换和重启。
 
 完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
 
