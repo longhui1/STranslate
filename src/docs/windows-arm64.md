@@ -6,6 +6,14 @@ ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack O
 
 源码基线是此 fork 的提交 `75f616a257bcf34d78d8929152fb579886d1d8e5`，保留 fork 已有功能。上游最近正式发行版为 `v2.0.10`。初始包版本使用 `2.0.10-arm64.1`，ARM64 修订递增后缀为 `2.0.10-arm64.2`；同步新版上游后使用例如 `2.0.11-arm64.1`。`vpk 1.2.0` 与原生更新组件要求标准三段 SemVer，不能使用四段 `packVersion`。采用这个后缀无需修改打包工具；正式 GitHub Release 的 `prerelease=false`，仍由稳定更新源读取。应用的数字程序集 / 文件版本分别对应 `2.0.10.1`、`2.0.10.2`，信息版本保留完整包版本；OTA 始终以 Velopack 安装版本比较，不能用数字程序集版本与包版本混比。
 
+## 第一阶段下载与实机 OTA
+
+- 直接使用：[最新 ARM64 Setup（2.0.10-arm64.2）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.2/STranslate-ARM64-win-arm64-Setup.exe)。
+- 完整资产、更新元数据和校验文件：[ARM64 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.2)。
+- 测试 OTA：[先安装首版 Setup（2.0.10-arm64.1）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.1/STranslate-ARM64-win-arm64-Setup.exe)，配置 DeepL / MiMo 并产生历史记录，然后从关于页面检查更新至 `2.0.10-arm64.2`；确认退出、替换、重启和数据保留。无需重新运行新版 Setup。
+
+安装包未代码签名，Windows 可能提示发布者未知。运行和功能验证清单见本文末尾；云端的构建与包校验不能代替这些设备验证。
+
 ## 安装与更新身份
 
 | 项目 | ARM64 值 | 作用 |
@@ -90,6 +98,8 @@ git push origin arm64-v2.0.11-arm64.1
 完整 [Windows CI 构建](https://github.com/longhui1/STranslate/actions/runs/37455184846) 已通过：主程序 ARM64 自包含 publish、20 个内置插件、同源 Rust helper 和三个 Velopack ARM64 原生组件全部编译成功；699 个 PE 文件通过程序树架构检查，真实 Setup、更新组件、便携包、全量包和 OTA 元数据均通过完整发布校验。12 个策略测试在 Windows 上全部通过，使用真实 Velopack 库与模拟网络覆盖不读取 x64 feed、忽略 GitHub 预发布、ARM64 修订升级、上游升级及不降级，插件策略覆盖微信拒绝和 MiMo 允许加载。MiMo 作者原始包已下载并检查 AnyCPU、依赖与完整文件结构；Linux CLI 备份 / 恢复 smoke 通过。
 
 首个 [公开 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.1) 已由 [正式发布 CI](https://github.com/longhui1/STranslate/actions/runs/37492362805) 成功生成并公开，包含 Setup、全量 `.nupkg`、`releases.win-arm64.json`、校验文件和 Velopack 原生组件来源记录。公开 feed 已确认包身份 `STranslate-ARM64` 与 `win-arm64` 通道一致。
+
+第二个 [公开 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.2) 由 [同一发布流程](https://github.com/longhui1/STranslate/actions/runs/37493813424) 再次成功生成，包含全量包和 `475499` 字节的 delta，并保留与第一版 SHA-256 完全相同的基准 full。Windows CI 用真实 `vpk delta patch` 重建后，1135 个文件的路径、解压长度和 SHA-256 全部一致；[公开重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.2/arm64-delta-validation.json) 记录包哈希与验证边界。两版公开下载的 Setup / 更新包 / feed 均已独立核对大小与 SHA-1 / SHA-256，关键 native PE 确认为 ARM64。使用原始公开 GitHub API / feed 和实际第一版 full 离线回放真实 Velopack 的 3 项检查也通过：第一版选中新版及 delta、最新版无更新、缺少本地基准时可使用 full OTA。这些验证没有执行 ARM64 Update.exe 或真实设备重启。
 
 完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
 
