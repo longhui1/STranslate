@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'ARM64 版本（三段或四段数字，发布后只能递增）'
+        description: 'ARM64 版本（如 2.0.10-arm64.1，发布后只能递增）'
         required: true
-        default: '2.0.10.1'
+        default: '2.0.10-arm64.1'
       publish:
         description: '发布正式 ARM64 GitHub Release'
         type: boolean
@@ -56,10 +56,10 @@ jobs:
           } elseif ($env:INPUT_VERSION) {
             $env:INPUT_VERSION
           } else {
-            '2.0.10.1'
+            '2.0.10-arm64.1'
           }
-          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(\.[1-9]\d*)?$') {
-            throw 'ARM64 版本必须是无前导零的三段或四段数字；末段为 0 时使用三段。'
+          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-arm64\.([1-9]\d*)$') {
+            throw 'ARM64 版本必须为上游三段版本加修订号，例如 2.0.10-arm64.1，数字不得有前导零。'
           }
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=arm64-v$version" >> $env:GITHUB_OUTPUT
@@ -83,14 +83,14 @@ jobs:
             if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
           }
           if ($existing -and -not $existing.draft) { throw '此 ARM64 Release 已发布；OTA 资源不能覆写，请递增版本。' }
-          $currentVersion = if ($env:ARM64_VERSION.Split('.').Count -eq 3) { [version]"$env:ARM64_VERSION.0" } else { [version]$env:ARM64_VERSION }
+          $currentVersion = [version]$env:ARM64_VERSION.Replace('-arm64.', '.')
           $page = 1
           do {
             $releases = @(Invoke-RestMethod "$api/releases?per_page=100&page=$page" -Headers $headers)
             foreach ($release in $releases) {
-              if (-not $release.draft -and -not $release.prerelease -and $release.tag_name -match '^arm64-v(\d+\.\d+\.\d+(\.\d+)?)$') {
+              if (-not $release.draft -and -not $release.prerelease -and $release.tag_name -match '^arm64-v(\d+\.\d+\.\d+-arm64\.[1-9]\d*)$') {
                 $remoteVersion = $Matches[1]
-                $remoteComparable = if ($remoteVersion.Split('.').Count -eq 3) { [version]"$remoteVersion.0" } else { [version]$remoteVersion }
+                $remoteComparable = [version]$remoteVersion.Replace('-arm64.', '.')
                 if ($remoteComparable -ge $currentVersion) {
                   throw "新版本必须高于已发布 ARM64 版本 $($release.tag_name)。"
                 }
@@ -99,7 +99,8 @@ jobs:
                   $feed = Invoke-RestMethod $feedAsset.browser_download_url
                   foreach ($asset in $feed.Assets) {
                     $feedVersion = [string]$asset.Version
-                    $feedComparable = if ($feedVersion.Split('.').Count -eq 3) { [version]"$feedVersion.0" } else { [version]$feedVersion }
+                    if ($feedVersion -notmatch '^\d+\.\d+\.\d+-arm64\.[1-9]\d*$') { throw "已发布 ARM64 feed 版本不符合发布规则：$feedVersion" }
+                    $feedComparable = [version]$feedVersion.Replace('-arm64.', '.')
                     if ($feedComparable -ge $currentVersion) {
                       throw "新版本必须高于已发布 ARM64 更新 feed 中的版本 $feedVersion。"
                     }

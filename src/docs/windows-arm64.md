@@ -4,7 +4,7 @@
 
 ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack OTA。目标是可安装、可持续升级的发行版，而不只是改变主程序的 RID。内置 DeepL API 与纯 .NET 社区 MiMo TTS 原包保持现有接口；微信内置 OCR 在发布和运行时排除；PaddleOCR / PP-OCRv6 不作为第一阶段交付条件。
 
-源码基线是此 fork 的提交 `75f616a257bcf34d78d8929152fb579886d1d8e5`，保留 fork 已有功能。上游最近正式发行版为 `v2.0.10`。初始 ARM64 版本使用 `2.0.10.1`，ARM64 修订使用第四段；同步新版上游后使用例如 `2.0.11.1`。Velopack 原生版本比较支持第四段，不再用只支持三段 SemVer 的额外解析阻断 OTA。
+源码基线是此 fork 的提交 `75f616a257bcf34d78d8929152fb579886d1d8e5`，保留 fork 已有功能。上游最近正式发行版为 `v2.0.10`。初始包版本使用 `2.0.10-arm64.1`，ARM64 修订递增后缀为 `2.0.10-arm64.2`；同步新版上游后使用例如 `2.0.11-arm64.1`。`vpk 1.2.0` 与原生更新组件要求标准三段 SemVer，不能使用四段 `packVersion`。采用这个后缀无需修改打包工具；正式 GitHub Release 的 `prerelease=false`，仍由稳定更新源读取。应用的数字程序集 / 文件版本分别对应 `2.0.10.1`、`2.0.10.2`，信息版本保留完整包版本；OTA 始终以 Velopack 安装版本比较，不能用数字程序集版本与包版本混比。
 
 ## 安装与更新身份
 
@@ -14,7 +14,7 @@ ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack O
 | Velopack package ID | `STranslate-ARM64` | 与官方 `STranslate` 的安装位置、包身份区分 |
 | 更新仓库 | `https://github.com/longhui1/STranslate` | 固定使用 fork 的 ARM64 Release |
 | 更新 channel | `win-arm64` | 只读取 `releases.win-arm64.json`，不回退 `releases.win.json` |
-| Git tag | `arm64-v2.0.10.1` | 触发独立 ARM64 发布 workflow |
+| Git tag | `arm64-v2.0.10-arm64.1` | 触发独立 ARM64 发布 workflow |
 | GitHub Release | 稳定、已发布，非 draft / prerelease | 保持现有稳定更新通道的筛选行为 |
 
 `UpdateFeedPolicy` 按**进程架构**选择源：原生 ARM64 进程固定使用上述仓库与显式 channel；官方 x64 进程即使运行在 ARM64 Windows 上，也保持上游更新规则。源不存入用户设置，迁移旧配置无法将 ARM64 改回官方 x64 更新源。已有手动更新、后台通知、下载、退出后替换与重启流程不变。ARM64 更新日志来自打包时的发行说明，避免显示另一发行版的日志。
@@ -28,7 +28,7 @@ Velopack 的 GitHub source 只读取最近 10 个 Release，所以这个 fork �
 在 Windows 上安装 PowerShell 7、Git、.NET 10 SDK、Rust，以及 Visual Studio 2022 的 C++ ARM64 构建工具和 Windows SDK。执行 `rustup target add aarch64-pc-windows-msvc`，初始化 `amd64_arm64` MSVC 开发环境，然后从仓库根目录执行：
 
 ```powershell
-./build-arm64.ps1 -Version 2.0.10.1
+./build-arm64.ps1 -Version 2.0.10-arm64.1
 ```
 
 脚本以失败即停止的方式完成以下工作：
@@ -68,7 +68,7 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 | 更新日志对话框的可选发行说明 | ARM64 展示同一包的日志；x64 继续使用原日志地址 |
 | `PluginManager` 微信稳定 ID 拒绝规则 | 避免旧配置 / 本地导入重新加载已知不兼容的 native 插件 |
 | 独立 ARM64 构建、验证脚本和 workflow | 与上游 x64 脚本隔离，锁定工具、源码和渠道；原 workflow 只增加 ARM64 事件隔离 |
-| 11 个更新 / 插件策略回归测试 | 检查无 x64 回退、稳定版本筛选、第四段升级、无降级及 MiMo 允许加载 |
+| 12 个更新 / 插件策略回归测试 | 检查无 x64 回退、稳定版本筛选、ARM64 修订升级、上游升级后修订重置、无降级及 MiMo 允许加载 |
 
 无需修改 DeepL、MiMo、ScreenGrab、NAudio 或 Rust helper 的功能源码。详细证据见 [插件审计](arm64-plugin-compatibility.md) 和 [原生依赖审计](arm64-native-dependencies.md)。同步上游后保留这几个小型补丁，重新运行 workflow；若上游调整插件 manifest / SDK、native 依赖、helper 命令或 Velopack，应重新审核对应边界。
 
@@ -76,9 +76,9 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 
 ## 已验证与待验证
 
-云端已完成主程序 ARM64 Release 编译和自包含 publish（零错误），确认主 EXE、运行时和 SQLite PE 为 ARM64；除微信 OCR 外，20 个内置插件均已 ARM64 publish 成功。完整测试项目编译通过；7 个更新用例使用真实 Velopack 库与模拟网络通过，包括不读取 x64 feed、忽略预发布、第四段修订升级与不降级，另 4 个插件策略用例通过反射调用已编译的真实 `PluginManager` 方法执行通过。MiMo 作者原始包已下载并检查 AnyCPU、依赖与完整文件结构；helper 的 ARM64 Windows Rust 依赖检查通过，Linux CLI 备份 / 恢复 smoke 通过。PowerShell 脚本及 workflow 的命令块语法检查通过，架构验证器实际拒绝了 x64 helper。
+Windows CI 已完成主程序 ARM64 自包含 publish、20 个内置插件、同源 Rust helper 和三个 Velopack ARM64 原生组件的编译；699 个 PE 文件通过程序树架构检查。MiMo 作者原始包已下载并检查 AnyCPU、依赖与完整文件结构；Linux CLI 备份 / 恢复 smoke 通过。更新策略测试使用真实 Velopack 库与模拟网络，包括不读取 x64 feed、忽略 GitHub 预发布、ARM64 修订升级、上游升级及不降级；插件策略覆盖微信拒绝和 MiMo 允许加载。
 
-上述主程序编译检查使用已有 helper 文件路径作为构建输入，**不是完整可交付包**；它不能替代完整 ARM64 helper、Setup 和元数据的发布校验。验证器的合成 fixture 检查也不是实际 Setup 构建证据。完整 Windows 构建与发布结果应以 workflow 成功产物为准。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实 OTA。
+完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
 
 MSVC 的 ARM64 开发环境会设置 `Platform=arm64`，因此 workflow 中运行 x64 测试时显式传入 `Platform=AnyCPU`，避免 .NET SDK 将测试程序集也判定为 ARM64。主程序发布同样显式设置 AnyCPU，原生进程架构由 `win-arm64` apphost 和运行时决定。不要把未经完整架构和安装包校验的编译目录上传为正式 ARM64 发行版。
 

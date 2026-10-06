@@ -14,13 +14,13 @@ public class UpdateFeedPolicyTests
     public async Task Arm64OverridesAnInstalledX64ChannelAndFindsRevisionUpdates()
     {
         using var feed = new ReleaseFeed(UpdateFeedPolicy.Arm64Repository);
-        feed.AddRelease("stable", false, ("win-x64", "999.0.0"), ("win-arm64", "2.0.3.2"));
-        var manager = feed.CreateManager(Architecture.Arm64, "2.0.3.1", "win-x64");
+        feed.AddRelease("stable", false, ("win-x64", "999.0.0"), ("win-arm64", "2.0.3-arm64.2"));
+        var manager = feed.CreateManager(Architecture.Arm64, "2.0.3-arm64.1", "win-x64");
 
         var update = await manager.CheckForUpdatesAsync();
 
         Assert.NotNull(update);
-        Assert.Equal("2.0.3.2", update.TargetFullRelease.Version.ToString());
+        Assert.Equal("2.0.3-arm64.2", update.TargetFullRelease.Version.ToString());
         Assert.True(update.TargetFullRelease.Version > manager.CurrentVersion!);
         Assert.Equal("ARM64 发布日志", update.TargetFullRelease.NotesMarkdown);
         Assert.Equal(new[] { $"{feed.Repository}/releases/download/stable/releases.win-arm64.json" }, feed.DownloadedFeeds);
@@ -32,7 +32,7 @@ public class UpdateFeedPolicyTests
         using var feed = new ReleaseFeed(UpdateFeedPolicy.Arm64Repository);
         feed.AddRelease("x64-only", false, ("win-x64", "999.0.0"), ("win", "999.0.0"));
 
-        var update = await feed.CreateManager(Architecture.Arm64, "2.0.3.1", "win-x64").CheckForUpdatesAsync();
+        var update = await feed.CreateManager(Architecture.Arm64, "2.0.3-arm64.1", "win-x64").CheckForUpdatesAsync();
 
         Assert.Null(update);
         Assert.Empty(feed.DownloadedFeeds);
@@ -42,25 +42,37 @@ public class UpdateFeedPolicyTests
     public async Task Arm64StableUpdatesIgnoreGithubPrereleases()
     {
         using var feed = new ReleaseFeed(UpdateFeedPolicy.Arm64Repository);
-        feed.AddRelease("stable", false, ("win-arm64", "2.0.3.2"));
+        feed.AddRelease("stable", false, ("win-arm64", "2.0.3-arm64.2"));
         feed.AddRelease("preview", true, ("win-arm64", "999.0.0"));
 
-        var update = await feed.CreateManager(Architecture.Arm64, "2.0.3.1", "win-arm64").CheckForUpdatesAsync();
+        var update = await feed.CreateManager(Architecture.Arm64, "2.0.3-arm64.1", "win-arm64").CheckForUpdatesAsync();
 
         Assert.NotNull(update);
-        Assert.Equal("2.0.3.2", update.TargetFullRelease.Version.ToString());
+        Assert.Equal("2.0.3-arm64.2", update.TargetFullRelease.Version.ToString());
         Assert.DoesNotContain(feed.DownloadedFeeds, url => url.Contains("/preview/"));
     }
 
     [Theory]
-    [InlineData("2.0.3.1")]
-    [InlineData("2.0.3.2")]
+    [InlineData("2.0.3-arm64.1")]
+    [InlineData("2.0.3-arm64.2")]
     public async Task Arm64DoesNotDowngradeOrReinstallTheCurrentVersion(string installedVersion)
     {
         using var feed = new ReleaseFeed(UpdateFeedPolicy.Arm64Repository);
-        feed.AddRelease("stable", false, ("win-arm64", "2.0.3.1"));
+        feed.AddRelease("stable", false, ("win-arm64", "2.0.3-arm64.1"));
 
         Assert.Null(await feed.CreateManager(Architecture.Arm64, installedVersion, "win-arm64").CheckForUpdatesAsync());
+    }
+
+    [Fact]
+    public async Task Arm64FindsANewUpstreamVersionWithAResetRevision()
+    {
+        using var feed = new ReleaseFeed(UpdateFeedPolicy.Arm64Repository);
+        feed.AddRelease("stable", false, ("win-arm64", "2.0.4-arm64.1"));
+
+        var update = await feed.CreateManager(Architecture.Arm64, "2.0.3-arm64.99", "win-arm64").CheckForUpdatesAsync();
+
+        Assert.NotNull(update);
+        Assert.Equal("2.0.4-arm64.1", update.TargetFullRelease.Version.ToString());
     }
 
     [Theory]

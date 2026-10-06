@@ -47,7 +47,7 @@ public class UpdaterService(
             }
 
             var newReleaseVersion = newUpdateInfo.TargetFullRelease.Version;
-            // 以安装包版本为准；Velopack 同时支持 ARM64 发布使用的第四段修订号。
+            // 以安装包版本为准，由 Velopack 比较 ARM64 SemVer 修订号。
             var currentVersion = updateManager.CurrentVersion!;
 
             logger.LogInformation($"Future Release <{JsonSerializer.Serialize(newUpdateInfo.TargetFullRelease)}>");

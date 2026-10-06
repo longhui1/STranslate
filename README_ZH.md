@@ -47,6 +47,8 @@
 
 ## 安装
 
+此 fork 的 Windows ARM64 版本请下载 [ARM64 Release](https://github.com/longhui1/STranslate/releases/latest) 中的 `STranslate-ARM64-win-arm64-Setup.exe` 安装。安装后使用此 fork 的独立 ARM64 应用内更新源。构建、上游同步及实机验证说明见 [Windows ARM64 维护文档](src/docs/windows-arm64.md)。
+
 下载最新 [Release](https://github.com/STranslate/STranslate/releases) 版本后解压即可使用
 
 ## 使用

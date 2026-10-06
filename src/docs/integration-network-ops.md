@@ -55,7 +55,7 @@
 2. 通过 Velopack `GithubSource` 检查新版本：
    - ARM64 进程固定使用 `https://github.com/longhui1/STranslate` 和 `win-arm64` channel；即使安装元数据记录旧 channel，也显式覆盖。没有 ARM64 feed 时不会回退到上游或 x64 feed。
    - 其他架构沿用上游仓库与安装包自身的 channel。
-   - 只接受已发布的稳定 GitHub Release，不包含草稿和预发布；以 Velopack 安装版本比较，支持第四段 ARM64 修订号，例如 `2.0.10.1` → `2.0.10.2`。
+   - 只接受已发布的稳定 GitHub Release，不包含草稿和预发布；以 Velopack 安装版本比较 ARM64 修订号，例如 `2.0.10-arm64.1` → `2.0.10-arm64.2`，不混用数字程序集版本。
    - 更新源不写入用户设置，恢复旧配置或从 x64 迁移配置不会改变 ARM64 更新源。
 3. 非静默检查时弹出 `UpdateChangelogDialog`：
    - 默认先显示加载动画（`ProgressRing`）。

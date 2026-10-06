@@ -78,7 +78,7 @@ function Assert-AppTree([string]$Directory) {
         }
     }
     $actualVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $Directory 'STranslate.dll')).Version
-    $expectedVersion = if ($Version.Split('.').Count -eq 3) { [version]"$Version.0" } else { [version]$Version }
+    $expectedVersion = [version]$Version.Replace('-arm64.', '.')
     if ($actualVersion -ne $expectedVersion) { throw "主程序集版本错误：需要 $Version，实际 $actualVersion。" }
     $sdkVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $Directory 'STranslate.Plugin.dll')).Version
     if ($sdkVersion -ne [version]'1.0.0.0') { throw "插件 SDK 程序集标识改变：需要 1.0.0.0，实际 $sdkVersion；现有社区插件可能无法加载。" }

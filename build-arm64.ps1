@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '2.0.10.1',
+    [string]$Version = '2.0.10-arm64.1',
     [string]$OutputDirectory = 'publish/arm64',
     [switch]$DownloadPrevious
 )
@@ -9,10 +9,11 @@ Set-StrictMode -Version Latest
 if (-not $IsWindows) { throw '完整 ARM64 构建需要 Windows、.NET 10 SDK、Rust 和 ARM64 MSVC 工具链。' }
 
 $cleanVersion = $Version -replace '^arm64-v', '' -replace '^v', ''
-if ($cleanVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(\.[1-9]\d*)?$') {
-    throw '版本号必须为无前导零的三段或四段数字，例如 2.0.10.1；末段为 0 时使用三段，避免同版本别名。'
+if ($cleanVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-arm64\.([1-9]\d*)$') {
+    throw '版本号必须为上游三段版本加 ARM64 修订号，例如 2.0.10-arm64.1，数字不得有前导零。'
 }
-foreach ($part in $cleanVersion.Split('.')) {
+$assemblyVersion = $cleanVersion.Replace('-arm64.', '.')
+foreach ($part in $assemblyVersion.Split('.')) {
     if ([long]$part -gt 65534) { throw '程序集版本各段不能超过 65534。' }
 }
 
@@ -68,7 +69,8 @@ try {
 
     $content = [Text.Encoding]::UTF8.GetString($originalAssemblyInfo)
     foreach ($attribute in @('AssemblyVersion', 'AssemblyFileVersion', 'AssemblyInformationalVersion')) {
-        $content = [regex]::Replace($content, "$attribute\(`"[^`"]+`"\)", "$attribute(`"$cleanVersion`")")
+        $attributeVersion = if ($attribute -eq 'AssemblyInformationalVersion') { $cleanVersion } else { $assemblyVersion }
+        $content = [regex]::Replace($content, "$attribute\(`"[^`"]+`"\)", "$attribute(`"$attributeVersion`")")
     }
     [IO.File]::WriteAllText($assemblyInfo, $content, [Text.UTF8Encoding]::new($false))
 
@@ -97,8 +99,9 @@ try {
         if ($LASTEXITCODE -eq 0) {
             Get-ChildItem $previousPath -Filter "$packageId-*-win-arm64-full.nupkg" | Where-Object {
                 $previousVersion = $_.Name -replace '^STranslate-ARM64-', '' -replace '-win-arm64-full\.nupkg$', ''
-                $previousComparable = if ($previousVersion.Split('.').Count -eq 3) { [version]"$previousVersion.0" } else { [version]$previousVersion }
-                $currentComparable = if ($cleanVersion.Split('.').Count -eq 3) { [version]"$cleanVersion.0" } else { [version]$cleanVersion }
+                if ($previousVersion -notmatch '^\d+\.\d+\.\d+-arm64\.[1-9]\d*$') { throw "上一版 ARM64 包版本不符合发布规则：$previousVersion" }
+                $previousComparable = [version]$previousVersion.Replace('-arm64.', '.')
+                $currentComparable = [version]$assemblyVersion
                 $previousComparable -lt $currentComparable
             } | Copy-Item -Destination $outputPath
         }
