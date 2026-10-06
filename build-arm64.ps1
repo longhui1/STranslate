@@ -95,7 +95,10 @@ try {
         if (Test-Path $previousPath) { Remove-Item $previousPath -Recurse -Force }
         New-Item $previousPath -ItemType Directory -Force | Out-Null
         # 第一版或网络不可用时仍可发布 full；vpk pack 和验证失败必须中止。
-        & $vpk download github --repoUrl $repoUrl --channel $channel --outputDir $previousPath --timeout 2
+        $downloadArguments = @('download', 'github', '--repoUrl', $repoUrl, '--channel', $channel, '--outputDir', $previousPath, '--timeout', '2')
+        # CI 的短期 token 避免 runner 共享 IP 的匿名限流；本地无 token 仍可生成 full。
+        if ($env:GH_TOKEN) { $downloadArguments += @('--token', $env:GH_TOKEN) }
+        & $vpk @downloadArguments
         if ($LASTEXITCODE -eq 0) {
             Get-ChildItem $previousPath -Filter "$packageId-*-win-arm64-full.nupkg" | Where-Object {
                 $previousVersion = $_.Name -replace '^STranslate-ARM64-', '' -replace '-win-arm64-full\.nupkg$', ''

@@ -55,7 +55,7 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 - `assets.win-arm64.json` 等 vpk 生成的配套元数据；
 - 可选 delta 包、便携 ZIP、SHA-256 校验文件和架构验证报告。
 
-更新不是通过下载 Setup 完成，而是通过 feed 定位全量 / delta `.nupkg`，再由已安装的 ARM64 `Update.exe` 替换程序。第一次没有旧 ARM64 包时生成全量包；后续可从相同 fork / channel 获取旧全量包作为 delta 基准，下载旧包失败时仍保留全量 OTA，不能因此切到官方源，也不能清理掉新 feed 或新包。
+更新不是通过下载 Setup 完成，而是通过 feed 定位全量 / delta `.nupkg`，再由已安装的 ARM64 `Update.exe` 替换程序。第一次没有旧 ARM64 包时生成全量包；后续可从相同 fork / channel 获取旧全量包作为 delta 基准。CI 使用 workflow 的短期 `GITHUB_TOKEN` 下载基准，避免 runner 共享 IP 的匿名 API 限流；本地没有 token 也可构建。下载旧包失败时仍保留全量 OTA，不能因此切到官方源，也不能清理掉新 feed 或新包。
 
 发布后应直接下载公开 feed，确认其中 `PackageId`、版本、包名、哈希与 Release 资产一致。第一版设备无更新可用是正常状态；必须保留一台安装旧 ARM64 版本的设备，用下一次更高版本实际验证 OTA，不能把模拟 feed 测试写成真实重启升级验证。
 
@@ -76,7 +76,7 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 
 ## 已验证与待验证
 
-Windows CI 已完成主程序 ARM64 自包含 publish、20 个内置插件、同源 Rust helper 和三个 Velopack ARM64 原生组件的编译；699 个 PE 文件通过程序树架构检查。MiMo 作者原始包已下载并检查 AnyCPU、依赖与完整文件结构；Linux CLI 备份 / 恢复 smoke 通过。更新策略测试使用真实 Velopack 库与模拟网络，包括不读取 x64 feed、忽略 GitHub 预发布、ARM64 修订升级、上游升级及不降级；插件策略覆盖微信拒绝和 MiMo 允许加载。
+完整 [Windows CI 构建](https://github.com/longhui1/STranslate/actions/runs/37455184846) 已通过：主程序 ARM64 自包含 publish、20 个内置插件、同源 Rust helper 和三个 Velopack ARM64 原生组件全部编译成功；699 个 PE 文件通过程序树架构检查，真实 Setup、更新组件、便携包、全量包和 OTA 元数据均通过完整发布校验。12 个策略测试在 Windows 上全部通过，使用真实 Velopack 库与模拟网络覆盖不读取 x64 feed、忽略 GitHub 预发布、ARM64 修订升级、上游升级及不降级，插件策略覆盖微信拒绝和 MiMo 允许加载。MiMo 作者原始包已下载并检查 AnyCPU、依赖与完整文件结构；Linux CLI 备份 / 恢复 smoke 通过。
 
 完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
 

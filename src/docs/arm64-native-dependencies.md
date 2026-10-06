@@ -51,7 +51,7 @@ cargo build --manifest-path src/STranslate.Host/Cargo.toml --release --locked --
 
 本阶段在 Linux 云端检查了上述 NuGet 内容、PE / CLR 架构标志、Rust 的 ARM64 目标依赖和架构条件。`cargo check --locked --target aarch64-pc-windows-msvc -p winapi -p clap -p chrono` 已通过，验证 helper 的 Windows API / 命令行 / 时间依赖可编译为该目标。另使用锁文件编译 Linux helper，并通过真实 CLI 验证 ZIP 备份 / 恢复完整保留 Unicode 文本、嵌套目录、二进制内容，以及不存在的目录返回失败。
 
-Linux 本身不能执行 Windows ARM64 程序。初始 ARM64 Rust 检查因未配置 Windows SDK (`windows.h`) 和 MSVC 库工具 (`lib.exe`) 而终止，因此须以 Windows CI 的实际构建结果作为 Windows 编译证据，不能把 Linux helper smoke 当作 Windows 功能验证。
+完整 [Windows CI 构建](https://github.com/longhui1/STranslate/actions/runs/37455184846) 已成功从同一份源码编译 ARM64 helper 与 Velopack Setup / update / stub，并生成实际安装与更新包。架构校验确认这些原生组件为 ARM64，helper 和安装 / 更新组件不依赖外部 `VCRUNTIME` / `MSVCP`；主程序、随包运行时、SQLite 及全部随包 PE 通过检查。Linux 本身不能执行 Windows ARM64 程序，Windows x64 runner 的交叉构建也不能替代 Windows ARM64 设备运行验证。
 
 真实 Windows ARM64 设备应验证：
 

@@ -133,9 +133,9 @@ try {
     $null = Assert-NativeArm64 (Join-Path $packageDirectory 'lib/app/Squirrel.exe') -RequireStaticCrt
     Assert-AppTree (Join-Path $packageDirectory 'lib/app')
     [xml]$nuspec = Get-Content (Join-Path $packageDirectory "$packageId.nuspec") -Raw
-    if ($nuspec.package.metadata.id -ne $packageId -or $nuspec.package.metadata.rid -ne 'win-arm64' -or
+    if ($nuspec.package.metadata.id -ne $packageId -or $nuspec.package.metadata.version -ne $Version -or $nuspec.package.metadata.rid -ne 'win-arm64' -or
         $nuspec.package.metadata.channel -ne 'win-arm64' -or $nuspec.package.metadata.machineArchitecture -ne 'arm64') {
-        throw '安装包 nuspec 的安装 ID、channel 或目标架构错误。'
+        throw '安装包 nuspec 的安装 ID、版本、channel 或目标架构错误。'
     }
     Write-Host '原生 ARM64 Setup、更新组件、Portable、完整包及 OTA 元数据验证通过。' -ForegroundColor Green
 }
