@@ -1,5 +1,7 @@
 # STranslate Windows ARM64
 
+`2.0.10-arm64.2` 保持首版应用功能，加入发布前的真实 delta 重建校验，并验证同一流水线可重复发布。需要测试 OTA 时，请先安装 [首版 Setup](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.1/STranslate-ARM64-win-arm64-Setup.exe)，安装 MiMo 并保存设置，再从应用的关于页面检查更新到本修订；无需再次运行新 Setup。
+
 第一阶段版本基于 fork 中的 STranslate 源码，首个 ARM64 包版本为 `2.0.10-arm64.1`。这是社区维护的原生 Windows ARM64 版本；后续沿用上游三段版本并递增 ARM64 修订号，例如 `2.0.10-arm64.2`，再随上游升级到 `2.0.11-arm64.1`。这些正式 GitHub Release 使用稳定更新通道；版本后缀用于区分社区修订。
 
 - 主程序、随包 .NET / WPF、SQLite、辅助程序及 Velopack 安装与更新组件使用 ARM64。

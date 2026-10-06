@@ -125,6 +125,15 @@ try {
     # 保留至多一个上一版 full，确保 vpk 写入的 feed 中每个包都有对应文件；
     # 不使用上游按下载前后文件名删除的方式，以免删除本次 metadata。
     & './scripts/Test-Arm64Artifacts.ps1' -AppDirectory $appDirectory -ReleaseDirectory $outputPath -Version $cleanVersion
+    $deltaPackage = Join-Path $outputPath "$packageId-$cleanVersion-win-arm64-delta.nupkg"
+    if (Test-Path $deltaPackage) {
+        $baselines = @(Get-ChildItem $outputPath -Filter "$packageId-*-win-arm64-full.nupkg" |
+            Where-Object Name -NE "$packageId-$cleanVersion-win-arm64-full.nupkg")
+        if ($baselines.Count -ne 1) { throw '增量验证需要唯一的上一版 ARM64 完整包。' }
+        & './scripts/Test-Arm64Delta.ps1' -VpkPath $vpk -BasePackage $baselines[0].FullName -DeltaPackage $deltaPackage `
+            -FullPackage (Join-Path $outputPath "$packageId-$cleanVersion-win-arm64-full.nupkg") `
+            -ReportPath (Join-Path $outputPath 'arm64-delta-validation.json')
+    }
     Copy-Item (Join-Path $workDirectory 'velopack-arm64-provenance.json') $outputPath
     Get-ChildItem $outputPath -File | Where-Object Name -NE 'SHA256SUMS.txt' | Sort-Object Name | ForEach-Object {
         "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)"

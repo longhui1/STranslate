@@ -55,9 +55,20 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 - `assets.win-arm64.json` 等 vpk 生成的配套元数据；
 - 可选 delta 包、便携 ZIP、SHA-256 校验文件和架构验证报告。
 
+以后同步上游并完成检查后，只需更新 `ARM64-RELEASE.md` 的发行说明并选择递增包版本，无需逐个修改项目。可在 GitHub Actions 的 **Windows ARM64 → Run workflow** 中选择对应源码分支，输入例如 `2.0.11-arm64.1`，勾选 `publish` 后运行；不勾选时只生成 CI artifact。也可从已提交的源码推送发布标签：
+
+```bash
+git tag -a arm64-v2.0.11-arm64.1 -m "Release native Windows ARM64 2.0.11-arm64.1"
+git push origin arm64-v2.0.11-arm64.1
+```
+
+同一上游版本的修正只递增 `arm64.N`；同步新的上游三段版本后可从 `arm64.1` 开始。不要混发无后缀的 ARM64 包版本，也不要使用 `+arm64.N` 的 build metadata，它不参与 SemVer 升级排序。正式发布使用 tag 或显式勾选 `publish`，普通分支构建不会自动公开 Release。
+
 更新不是通过下载 Setup 完成，而是通过 feed 定位全量 / delta `.nupkg`，再由已安装的 ARM64 `Update.exe` 替换程序。第一次没有旧 ARM64 包时生成全量包；后续可从相同 fork / channel 获取旧全量包作为 delta 基准。CI 使用 workflow 的短期 `GITHUB_TOKEN` 下载基准，避免 runner 共享 IP 的匿名 API 限流；本地没有 token 也可构建。下载旧包失败时仍保留全量 OTA，不能因此切到官方源，也不能清理掉新 feed 或新包。
 
-发布后应直接下载公开 feed，确认其中 `PackageId`、版本、包名、哈希与 Release 资产一致。第一版设备无更新可用是正常状态；必须保留一台安装旧 ARM64 版本的设备，用下一次更高版本实际验证 OTA，不能把模拟 feed 测试写成真实重启升级验证。
+存在 delta 时，发布前还会用同版本 `vpk delta patch` 从上一版 full 实际重建新包，并逐文件比较 ZIP 路径、长度和 SHA-256；生成的 `arm64-delta-validation.json` 记录输入包哈希和结果。重建 ZIP 的压缩字节可能与原 full 不同，因此不能比较整个 ZIP 的哈希代替内容检查。此检查在 Windows CI 中运行，涵盖 Windows MSDelta 格式；它证明增量包内容可重建，不能代替 ARM64 `Update.exe` 在设备上的退出替换和重启验证。
+
+发布后应直接下载公开 feed，确认其中 `PackageId`、版本、包名、哈希与 Release 资产一致。最新版设备无更新可用是正常状态；必须保留一台安装旧 ARM64 版本的设备，用下一次更高版本实际验证 OTA，不能把模拟 feed 测试写成真实重启升级验证。首次交付保留 [首版 Setup](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.1/STranslate-ARM64-win-arm64-Setup.exe)，可先安装 `2.0.10-arm64.1`，添加 DeepL / MiMo 和历史记录，再从关于页面检查更新到后续修订，确认数据保留并仍为 ARM64。
 
 ## 必要修改清单
 
@@ -77,6 +88,8 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 ## 已验证与待验证
 
 完整 [Windows CI 构建](https://github.com/longhui1/STranslate/actions/runs/37455184846) 已通过：主程序 ARM64 自包含 publish、20 个内置插件、同源 Rust helper 和三个 Velopack ARM64 原生组件全部编译成功；699 个 PE 文件通过程序树架构检查，真实 Setup、更新组件、便携包、全量包和 OTA 元数据均通过完整发布校验。12 个策略测试在 Windows 上全部通过，使用真实 Velopack 库与模拟网络覆盖不读取 x64 feed、忽略 GitHub 预发布、ARM64 修订升级、上游升级及不降级，插件策略覆盖微信拒绝和 MiMo 允许加载。MiMo 作者原始包已下载并检查 AnyCPU、依赖与完整文件结构；Linux CLI 备份 / 恢复 smoke 通过。
+
+首个 [公开 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.1) 已由 [正式发布 CI](https://github.com/longhui1/STranslate/actions/runs/37492362805) 成功生成并公开，包含 Setup、全量 `.nupkg`、`releases.win-arm64.json`、校验文件和 Velopack 原生组件来源记录。公开 feed 已确认包身份 `STranslate-ARM64` 与 `win-arm64` 通道一致。
 
 完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
 
