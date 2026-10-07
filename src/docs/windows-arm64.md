@@ -40,7 +40,7 @@ ARM64 从 `arm64.3` 起复用 Velopack `SimpleWebSource` 读取 latest 正式 Re
 在 Windows 上安装 PowerShell 7、Git、.NET 10 SDK、Rust，以及 Visual Studio 2022 的 C++ ARM64 构建工具和 Windows SDK。执行 `rustup target add aarch64-pc-windows-msvc`，初始化 `amd64_arm64` MSVC 开发环境，然后从仓库根目录执行：
 
 ```powershell
-./build-arm64.ps1 -Version 2.0.10-arm64.1
+./build-arm64.ps1 -Version 2.0.10-arm64.4
 ```
 
 脚本以失败即停止的方式完成以下工作：
@@ -109,9 +109,17 @@ git push origin arm64-v2.0.11-arm64.1
 
 第三个 [公开 Release（arm64.3）](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.3) 的 [Windows 发布 CI](https://github.com/longhui1/STranslate/actions/runs/37499748393) 已成功完成。修复实机报告的 GitHub 匿名 API `403 rate limit exceeded`，19 个更新策略测试覆盖零 API 检查、缺 feed 不回退、固定 tag 下载与参数传递；插件策略继续检查微信拒绝和 MiMo 允许。公开下载的 Setup、full、delta、feed 和来源记录已独立校验 SHA-256，feed 包同时核对大小和 SHA-1；Setup 确认为原生 ARM64，全量包程序树的 700 个 PE 与 20 个内置插件再次通过校验，包内程序集包含新的静态 feed / 固定 tag 实现。
 
-本版保留上一版 full，delta 为 `681090` 字节。Windows CI 的 [真实 delta 重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.3/arm64-delta-validation.json) 确认 1135 个文件的路径、长度和 SHA-256 一致。最新公开 feed 回放的 3 项真实 Velopack 检查通过：上一版真实 full 选中本版 delta、本版无更新、首版没有本地基准时选中本版 full；全过程零 GitHub API 调用。另用未修改的 Velopack 默认 `HttpClientFileDownloader` 实际读取公开 latest feed，从固定 `arm64-v2.0.10-arm64.3` tag 下载 delta 并核对 SHA-256，无 token、无自定义 TLS / HTTP handler。这些云端检查没有执行 ARM64 Update.exe 或实机覆盖安装、退出替换和重启。
+`arm64.3` 保留上一版 full，delta 为 `681090` 字节。Windows CI 的 [真实 delta 重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.3/arm64-delta-validation.json) 确认 1135 个文件的路径、长度和 SHA-256 一致。当时公开 feed 回放的 3 项真实 Velopack 检查通过：上一版真实 full 选中本版 delta、本版无更新、首版没有本地基准时选中本版 full；全过程零 GitHub API 调用。另用未修改的 Velopack 默认 `HttpClientFileDownloader` 实际读取公开 latest feed，从固定 `arm64-v2.0.10-arm64.3` tag 下载 delta 并核对 SHA-256，无 token、无自定义 TLS / HTTP handler。这些云端检查没有执行 ARM64 Update.exe 或实机覆盖安装、退出替换和重启。
 
-完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。云端不能运行 ARM64 WPF、系统音频、Windows 安装或真实重启 OTA；架构验证、模拟 feed 测试与设备运行验证应分别记录。
+第四个 [公开 Release（arm64.4）](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.4) 于 `2026-10-07 04:21:24 UTC` 发布，[正式发布 CI](https://github.com/longhui1/STranslate/actions/runs/37570069601) 的构建、Windows 11 ARM64 运行和发布三个 job 均成功，对应源码提交 [`dde1fd1cca9ee119e0fbd60edb0535f4fb479d22`](https://github.com/longhui1/STranslate/commit/dde1fd1cca9ee119e0fbd60edb0535f4fb479d22)。20 项模型缓存测试、30 项更新 / 插件策略测试全部成功；程序 staging 的 717 个 PE、Portable 程序树的 716 个 PE、全量包程序树的 718 个 PE 与 21 个内置插件通过架构及资源检查。不同程序树包含的 Velopack 组件不同，因此 PE 计数也不同。Setup、全量包、Portable 和 OTA feed 均通过验证，OCR 模型和字典没有进入任何发布包。
+
+本次 [ARM64 OCR 运行报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-validation.json) 绑定上述源码提交、CI run ID 和实际全量包 SHA-256 `1702b09bbb9177ad6fb5f57dde5b8e3ebaf4eab097dec68e99fa6feb112e2070`。真实 ARM64 进程通过原有插件加载器加载包内 SDK 和 OCR 插件，9 项检查覆盖在线模型下载失败 / 取消 / 重试、坏缓存修复、缓存后禁止 HTTP 的中英识别与原图四点坐标、预取消、ONNX Runtime 原生推理取消及排队恢复、两个服务实例并发和释放后拒绝请求。该 runner 对 ModelScope 的三个权重请求返回 HTTP 403，固定 GitHub commit 后备源成功下载并通过大小与哈希校验；字符字典由 ModelScope 返回 HTTP 200。[原生依赖来源报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-provenance.json) 记录实际 ARM64 库、三个 app-local CRT `14.44.35211.0` 和许可文件；实际加载模块均来自安装包且为严格 `0xAA64`。
+
+`arm64.3 → arm64.4` 的 [真实 delta 重建报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-delta-validation.json) 确认 1164 个文件的路径、解压长度与 SHA-256 全部一致。公开资产包含 `181945574` 字节的 Setup、`176139494` 字节的本版 full 和 `15918560` 字节的 delta。新 OCR 插件随同一次全量 / 增量更新交付，已下载模型仍保存在用户缓存目录。运行报告证明的是包内插件在 ARM64 Windows 上执行，仍不等同于设备上的 Setup 安装或应用退出后 OTA 替换与重启。
+
+发布后已用生产 `UpdateFeedPolicy` 与 Velopack 默认 `HttpClientFileDownloader` 实际读取公开 latest feed，再从固定 `arm64-v2.0.10-arm64.4` tag 下载 `15918560` 字节的 delta，SHA-256 `265ce58b94a772ab63b9507bfa62d41b8131b4437a389454277f38e43cd4a6ce` 与 feed 一致。此检查无需 token，也没有使用自定义 TLS / HTTP handler；它验证公开更新发现与下载链路，未运行 Windows ARM64 `Update.exe` 的退出替换与重启。
+
+完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。Windows ARM64 runner 可以验证插件和原生 OCR；云端尚未完成 Setup 交互安装、WPF 桌面流程、系统音频播放或 OTA 退出替换与重启，不能将这些流程写为已通过。
 
 MSVC 的 ARM64 开发环境会设置 `Platform=arm64`，因此 workflow 中运行 x64 测试时显式传入 `Platform=AnyCPU`，避免 .NET SDK 将测试程序集也判定为 ARM64。主程序发布同样显式设置 AnyCPU，原生进程架构由 `win-arm64` apphost 和运行时决定。不要把未经完整架构和安装包校验的编译目录上传为正式 ARM64 发行版。
 
@@ -119,10 +127,10 @@ MSVC 的 ARM64 开发环境会设置 `Platform=arm64`，因此 workflow 中运�
 
 1. Setup 全新安装、正常启动、卸载、快捷方式和 ARM64 进程架构；无预装 .NET / VC Redist 的设备也能使用。
 2. DeepL API 翻译、取消请求及设置持久化；MiMo 从市场和本地原包安装、界面加载、真实 API 合成、MP3 播放、停止与再次播放。
-3. 多屏 / DPI 截图、图片翻译、剪贴板图像、二维码；在线 OCR 服务配置后能识别，微信 OCR 明确禁用。
+3. 多屏 / DPI 截图、图片翻译、剪贴板图像、二维码；内置 ARM64 PaddleOCR 模型下载进度、取消和重试，缓存后断网识别与原图对齐；微信 OCR 明确禁用。
 4. 热键、Ctrl+CC、鼠标划词、前台激活、托盘、通知、历史数据库；分别从 ARM64 与模拟 x64 应用触发。
 5. 普通 / 管理员 / 免 UAC 启动、计划任务、重启、备份恢复、便携配置迁移及中文 / 空格路径。
-6. 旧 ARM64 版通过应用内更新到下一版，确认下载、退出、替换、重启成功，仍为 ARM64，配置、历史和 MiMo 保留。
+6. 从已安装的 `arm64.3` 应用内更新到 `arm64.4`，确认下载、退出、替换、重启成功，仍为 ARM64，配置、历史和 MiMo 保留；后续 OTA 还需确认 OCR 设置与用户模型缓存保留。
 7. 无更新、网络中断、取消下载和错误 feed 的用户体验；官方 x64 Release 发布时 ARM64 不误提示或下载 x64 包。
 
 请记录 Windows 版本、设备型号、安装包 SHA-256、版本号和日志。设备验证未通过前，不将架构检查表述为全部功能已验证。

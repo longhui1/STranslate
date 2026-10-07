@@ -6,6 +6,8 @@
 
 模型不随 Setup、Portable 或更新包预装。首次识别前会在线获取 PP-OCRv6 Small 检测、识别、文本行方向模型及字符字典，也可先在插件设置中下载。下载复用宿主 HTTP 服务与网络设置，显示进度，支持取消和失败重试。模型放在该插件的用户缓存目录中，校验成功后保留；后续识别在本地执行，不上传图片。
 
+四个文件合计 `32,257,432` 字节，约 31 MiB。下载源和后备源固定在 `model-manifest.json`；权重源不可用时自动尝试后备源，仍须匹配同一大小和 SHA-256。发布 CI 的 ModelScope 权重请求曾返回 HTTP 403，而固定 GitHub commit 后备源成功，这不代表用户设备上的 ModelScope 一定不可访问。
+
 下载和识别采用分别的超时。模型下载允许较长时间，避免将首次下载误判为识别超时；模型下载完成后再计识别准备与推理超时。首次创建 ONNX Session 的原生初始化没有取消 API；此时取消会在初始化返回后生效，不能宣称硬中断。Session 就绪后的实际推理使用 ONNX Runtime `RunOptions.Terminate` 中止，后续可再次识别。取消或失败时删除本次临时文件，已完整下载并通过校验的文件继续保留，下次只补齐缺失文件。缓存坏文件需要重新下载；更换模型版本时同步更新模型清单中的来源和 SHA-256。
 
 本版使用 Small 模型的 CPU 推理，支持中文、英文及模型字典中的多语言。识别结果受字号、图片清晰度和模型训练数据影响。模型下载依赖网络；下载完成后的本地识别可离线使用。系统截图、热键及图片翻译的完整交互仍需在设备上验证。
@@ -48,6 +50,30 @@ NuGet 的 ONNX Runtime build props 会按 AnyCPU 默认选择 x64 Content，因�
 发布前检查 native 架构、完整依赖、SDK 身份、插件 ID、模型清单和包内无模型文件。Windows ARM64 runner 从实际完整包加载内置插件，在线获取模型并执行中文 / 英文 OCR、文本坐标、取消和缓存行为验证。只有构建与此运行验证均通过，才上传完整 Release 并公开；模型缓存及 CI 临时目录不会进入发布包。
 
 升级库或模型时，应保持插件 ID，不用社区 x64 ID；更新固定版本、下载清单与许可归属，然后完整运行 CI。若两个旧插件后来提供原生 ARM64 版本，可重新审核后调整宿主拒绝规则。不要绕过架构或运行检查，仅用托管 DLL 的 AnyCPU 标志宣称 native 已适配。
+
+## arm64.4 的实际验证记录
+
+2026-10-07 的 [正式 CI run 37570069601](https://github.com/longhui1/STranslate/actions/runs/37570069601) 使用源码 [`dde1fd1cca9ee119e0fbd60edb0535f4fb479d22`](https://github.com/longhui1/STranslate/commit/dde1fd1cca9ee119e0fbd60edb0535f4fb479d22)，构建、真实 ARM64 运行与发布三个 job 均成功，[arm64.4 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.4) 已于 `2026-10-07 04:21:24 UTC` 公开。Windows 构建 job 的 20 项模型缓存测试和 30 项更新 / 插件策略测试全部通过；真实 `windows-11-arm` job 从该次完整 `.nupkg` 解包、复用宿主 `PluginAssemblyLoader` 和 SDK，然后执行生产插件。临时模型在用户缓存路径下载，检查结束后删除，没有重新打进安装或更新包。
+
+[ARM64 OCR 运行报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-validation.json) 的 `Success=true`、操作系统与进程架构均为 `Arm64`，并记录源码提交、CI run ID 和全量包 SHA-256，避免将其他构建的结果当成本次验证。9 项检查全部通过：
+
+| 检查 | 实际验证范围 |
+| --- | --- |
+| `ModelDownloadFailure` | 仅在 HTTP 边界注入 503，生产缓存管理器返回可重试错误并清理临时文件 |
+| `ModelDownloadCancellation` | 真实在线响应已写入部分模型后取消，临时文件清理成功 |
+| `OnlineModelsAndRetry` | 取消后重试成功，三个模型及字符字典的大小与 SHA-256 完全匹配固定清单 |
+| `CorruptedCacheRecovery` | 人为损坏同长度字典，检测哈希错误后重新在线下载并校验 |
+| `ChineseEnglishAndOriginalCoordinates` | 禁止 HTTP 后真实识别“中文翻译测试”和“Windows ARM64 OCR”，每个文本框有四个原图像素点并覆盖文字区域 |
+| `PreCancellation` | 已取消请求不进入 native 推理，以宿主要求的 `TaskCanceledException` 返回 |
+| `InFlightNativeCancellationAndQueuedRecovery` | 捕获 ORT 原生 `Exiting due to terminate flag being set to true`，下一排队请求仍能成功识别 |
+| `ConcurrentPluginInstances` | 两个生产插件实例共享有效缓存，独立引擎同时识别且没有重复 HTTP 下载 |
+| `DisposedInstanceRejectsWork` | 释放后的插件拒绝继续接受识别请求 |
+
+报告中的真实 HTTP 记录显示：ModelScope 的 det / cls / rec 权重请求返回 403，三个固定 GitHub commit 后备地址返回 200；ModelScope 字典返回 200。不能把注入的 503 故障测试写成下载源本身失败，也不能据此承诺所有地区的源可用性。该检查使用真实生产模型管理器和在线网络适配器；宿主代理设置的界面操作仍留给设备验收。
+
+[原生依赖来源报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-provenance.json) 记录官方 ORT / SkiaSharp、许可和模型清单，新增 app-local `msvcp140.dll`、`msvcp140_1.dll`、`vcruntime140.dll` 的文件版本均为 `14.44.35211.0`。ARM64 运行报告进一步核对实际加载路径与字节哈希：ORT、SkiaSharp 和 CRT 均从完整包路径加载，PE machine 严格为 `0xAA64`，没有借用 runner 预装的 CRT 掩盖缺件。报告同时包含 .NET 原有的 `vcruntime140_cor3.dll`，它不是本次新增 CRT 闭包的一项。
+
+同次 Windows 构建还从 `arm64.3` full 与 `arm64.4` delta 真实重建新包，[公开 delta 报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-delta-validation.json) 确认 1164 个文件的路径、解压长度与 SHA-256 一致。以上证据没有执行交互 Setup、WPF 截图 / 图片翻译窗口或真实应用退出后的 OTA 替换与重启，也没有验证 DeepL API 与 MiMo 的安装、合成及音频播放。
 
 ## 设备验收
 

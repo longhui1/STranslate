@@ -10,7 +10,7 @@
 | 社区 DeepL Web Translate | 复用社区原包 | 本次审计的 `boxi-wangji/STranslate.Plugin.Translate.DeepLWeb` 同样使用宿主 HTTP 服务，无 curl 原生依赖。免费网页端点的可用性由服务端决定，需要实机网络验证。 |
 | 社区 MiMo TTS | 从现有市场或原始 `.spkg` 安装，无独立 fork | AnyCPU 托管插件，调用 MiMo HTTP API，将 Base64 MP3 交给宿主音频播放器。真实 API 密钥、合成与 Windows ARM64 音频播放需要实机验证。 |
 | 微信内置 OCR | ARM64 发布排除，运行时拒绝加载及重新安装 | `WeChatOcr` 的原生组件没有本阶段所需的 ARM64 支持。原生 ARM64 进程按其稳定 `PluginID` 跳过已存在插件，并记录原因；安装入口在移动文件之前明确拒绝该包。x64 宿主保持原有行为。 |
-| PaddleOCR / PP-OCRv6 | `arm64.4` 起内置独立 ARM64 插件 | 官方 ARM64 ONNX Runtime + SkiaSharp，复用 RapidOcrNet 算法；Small 模型首次在线下载并校验，缓存后本地识别。两个已知 x64 社区包拒绝加载及安装，新 ID 不被其市场更新覆盖。详见 [OCR 文档](windows-arm64-paddleocr.md)。 |
+| PaddleOCR / PP-OCRv6 | `arm64.4` 起内置独立 ARM64 插件 | 官方 ARM64 ONNX Runtime + SkiaSharp，复用 RapidOcrNet 算法；Small 模型首次在线下载并校验，缓存后本地识别。真实 Windows ARM64 runner 已加载发布包插件并完成中英文识别与取消 / 缓存检查。两个已知 x64 社区包拒绝加载及安装，新 ID 不被其市场更新覆盖。详见 [OCR 文档](windows-arm64-paddleocr.md)。 |
 
 ## 插件系统为何可复用
 
@@ -35,7 +35,7 @@
 - 项目唯一直接 NuGet 依赖为 `STranslate.Plugin 1.0.8`。发布包依赖中 SDK 的 `AssemblyVersion` 为 `1.0.0.0`，与当前宿主 SDK 保持相同程序集标识；所调用的 `IAudioPlayer.PlayAsync(byte[], CancellationToken)` 在当前宿主仍然存在。
 - `Main.PlayAudioAsync()` 使用宿主 `HttpService` 请求 MiMo，解析 Base64 音频后调用宿主 `AudioPlayer`；插件本身没有 P/Invoke、外部进程或平台专用路径。
 
-以上已验证包结构、CLR 架构标志和接口引用；云端没有 Windows ARM64 WPF/音频设备，尚不能将这些检查表述为已完成真实安装、界面加载或播放验证。
+以上已验证包结构、CLR 架构标志和接口引用；云端尚未完成 MiMo 的 WPF 界面及实际音频播放，不能将这些检查表述为已完成真实安装、界面加载或播放验证。
 
 社区 DeepLWeb 审计源码提交为 `bb5874318a2fd65edb56396f834647cb7d3da0c9`，manifest 版本为 `1.0.1`。本阶段不将其源码或其他社区仓库复制进主仓库，也不对其长期兼容性做超出本次审计的保证。
 
@@ -45,7 +45,21 @@
 
 `arm64.4` 另拒绝 PaddleOCR 官方 ID `c5914774d4854623ad11912676c7007b` 和 PaddleV6 社区 ID `26b37788a09c4999a296255eb0c95129` 的 x64 原生实现，并以独立 ID 内置 ARM64 版本；如果这些项目后来发布 ARM64 包，需要重新检查后调整规则。
 
-同步上游时，确认微信插件 ID 是否改变、native 组件是否新增官方 ARM64 支持；若它获得完整 ARM64 支持，应同时移除发布排除与运行时拒绝规则。DeepL 和 MiMo 不需要长期维护的 ARM64 分支。`PluginPlatformCompatibilityTests` 覆盖微信在 ARM64/x64 的行为，以及 MiMo 的原始 ID 在 ARM64 上仍允许加载。
+同步上游时，确认微信插件 ID 是否改变、native 组件是否新增官方 ARM64 支持；若它获得完整 ARM64 支持，应同时移除发布排除与运行时拒绝规则。DeepL 和 MiMo 不需要长期维护的 ARM64 分支。`PluginPlatformCompatibilityTests` 覆盖微信及两种旧 PaddleOCR 在 ARM64/x64 的行为，以及 MiMo 的原始 ID 和内置 ARM64 OCR 的新 ID 在 ARM64 上仍允许加载。
+
+## `arm64.4` 真实 ARM64 插件验证
+
+2026-10-07 的 [正式 CI](https://github.com/longhui1/STranslate/actions/runs/37570069601) 对源码 [`dde1fd1cca9ee119e0fbd60edb0535f4fb479d22`](https://github.com/longhui1/STranslate/commit/dde1fd1cca9ee119e0fbd60edb0535f4fb479d22) 完成构建与真实 Windows ARM64 插件验证，并公开发布 [`2.0.10-arm64.4`](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.4)。20 项生产模型管理器测试和 30 项更新 / 插件兼容性测试通过；ARM64 runner 使用完整发布包中的插件，以宿主的 `PluginAssemblyLoader` 加载，SDK 身份保持 `STranslate.Plugin, Version=1.0.0.0`。
+
+内置插件 ID 为 `c67c0e3de45b48f6a852ffa8f0aae2f2`，不复用两种旧 x64 插件的 ID。发布包包含模型清单与运行库，不预装模型或字典。ARM64 runner 的 9 项检查通过：
+
+- 真实在线下载四个文件并验证大小 / SHA-256；注入下载失败、传输中取消、清理临时文件后重试，以及损坏字典后的重新下载。
+- 完整缓存后禁用网络，识别中文及英文图片并验证原图四点坐标；两个插件实例共享缓存、使用各自 native engine 同时识别。
+- 请求预取消、ONNX Runtime 运行中 terminate 取消、排队请求恢复，以及释放后的实例拒绝新工作。取消出口为宿主处理的 `TaskCanceledException`。
+
+本次 runner 下载 det / cls / rec 的 ModelScope 地址返回 HTTP 403，随后固定提交的 GitHub Raw 备用地址返回 200，字典的 ModelScope 地址直接返回 200。全部文件最终均通过清单哈希；这验证了备用源及缓存流程，不保证用户网络下每个下载源均可访问。首次下载仍需要用户网络可达至少一个可信源。
+
+公开发行产物附 [真实 ARM64 运行报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-validation.json) 和 [原生依赖来源报告](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-provenance.json)。报告绑定完整包、源码提交及 CI run；这些 OCR 验证不覆盖 DeepL 的真实 API、MiMo 的实际安装与音频播放、WPF 设置界面或交互式 Setup / OTA。
 
 ## Windows ARM64 实机验证
 
@@ -55,3 +69,4 @@
 4. 执行一次 ARM64 应用内 OTA 升级，确认已安装的 MiMo 和保存的设置仍可使用；插件自身升级仍走社区原始发布包。
 5. 若数据目录已有微信内置 OCR，确认 ARM64 启动日志说明跳过原因、程序不加载其 DLL；重新导入微信包应显示明确不支持提示。其旧服务不会在 ARM64 上执行。
 6. 如使用社区 DeepLWeb，验证实际网络环境下的免费端点；API 返回限流或禁用时区分服务端限制与插件加载失败。
+7. 添加新的 `PaddleOCR V6 (ARM64)` 服务，在设置页下载模型并测试进度、取消、失败后重试；使用截图、剪贴板图片及图片翻译验证桌面流程，缓存后断网再次识别。已有旧 x64 PaddleOCR 服务不会自动迁移到新 ID，应重新添加并选择 ARM64 服务；升级后确认其缓存和设置保留。

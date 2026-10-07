@@ -19,7 +19,7 @@
 | 热键与鼠标钩子 | `ChefKeys 0.1.2`、`MouseKeyHook 5.7.1`、`NHotkey 4.0.0` 和 `H.InputSimulator 1.5.0` 为 AnyCPU 托管 DLL；应用的低级鼠标钩子使用 CsWin32 生成的句柄 / 结构，窗口指针适配使用 `nint` 与 `sizeof(nint)` | 保留 Win32 实现；实机分别验证原生 ARM64 与模拟 x64 应用中的热键、Ctrl+CC、鼠标划词和前台激活 |
 | 托盘与通知 | `Hardcodet.NotifyIcon.Wpf 2.0.1`、`Microsoft.Toolkit.Uwp.Notifications 7.1.3` 为 AnyCPU 托管 DLL，CLR flags 为 `0x9`；调用系统托盘、WinRT / COM 通知 API | 保留上游实现；验证托盘菜单、通知展示和点击回调，尤其验证安装 / OTA 后的可执行文件路径变化 |
 | Win32 调用 | 本仓库显式 `DllImport` 指向 `user32.dll`、`shcore.dll` 等系统 DLL；CsWin32 负责其他系统 API 声明，未发现应用自行加载其他 x64 native DLL | 使用 ARM64 Windows 自带系统组件；保留调用代码并执行真机功能检查 |
-| 内置 PaddleOCR V6 (ARM64) | RapidOcrNet 4.2.0 + 官方 ONNX Runtime 1.29.0 / SkiaSharp 3.119.1；模型首次在线下载 | RID 选择原生 ARM64，附官方 app-local ARM64 CRT；包内不预装模型，由 Windows ARM64 runner 实际识别后发布 |
+| 内置 PaddleOCR V6 (ARM64) | RapidOcrNet 4.2.0 + 官方 ONNX Runtime 1.29.0 / SkiaSharp 3.119.1；模型首次在线下载 | RID 选择原生 ARM64，附官方 app-local ARM64 CRT；包内不预装模型。`arm64.4` 正式构建的真实 Windows ARM64 runner 已从完整包加载 native 库并识别中英文，验证范围见下文 |
 | Velopack | 独立更新器 / 安装器是发布工具生成的 native 组件，不属于主程序托管 DLL | 必须用 ARM64 打包目标和独立 ARM64 更新频道；架构及 OTA 验证由发布流程负责 |
 
 `ScreenGrab` 的 NuGet 元数据指向上游 [ZGGSONG/ScreenGrab](https://github.com/ZGGSONG/ScreenGrab)，1.0.17 对应提交 `9acf5b25278c9f27c6372d0477de63b077d6e416`。保持此依赖可直接跟随官方版本，不需要额外 ARM64 fork。
@@ -54,6 +54,17 @@ cargo build --manifest-path src/STranslate.Host/Cargo.toml --release --locked --
 
 完整 [Windows CI 构建](https://github.com/longhui1/STranslate/actions/runs/37455184846) 已成功从同一份源码编译 ARM64 helper 与 Velopack Setup / update / stub，并生成实际安装与更新包。架构校验确认这些原生组件为 ARM64，helper 和安装 / 更新组件不依赖外部 `VCRUNTIME` / `MSVCP`；主程序、随包运行时、SQLite 及全部随包 PE 通过检查。Linux 本身不能执行 Windows ARM64 程序，Windows x64 runner 的交叉构建也不能替代 Windows ARM64 设备运行验证。
 
+### `arm64.4` 正式构建与原生运行证据
+
+2026-10-07 的 [正式 CI](https://github.com/longhui1/STranslate/actions/runs/37570069601) 使用源码提交 [`dde1fd1cca9ee119e0fbd60edb0535f4fb479d22`](https://github.com/longhui1/STranslate/commit/dde1fd1cca9ee119e0fbd60edb0535f4fb479d22)。Windows 构建 job `112626469287`、真实 Windows ARM64 验证 job `112628772795` 与 publish job 均成功；[`2.0.10-arm64.4` Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.4) 于 `2026-10-07T04:21:24Z` 公开发布。
+
+- 发布目录共检查 717 个 PE、21 个内置插件；完整更新包检查 718 个 PE。所有非纯 IL 原生文件均为严格的 ARM64 `0xAA64`，没有将 ARM64EC / ARM64X 或 x64 文件作为合格 ARM64 native 文件。
+- 为 ONNX Runtime 新附的 app-local CRT 是 `msvcp140.dll`、`msvcp140_1.dll`、`vcruntime140.dll`，三者 `FileVersion` 均为 `14.44.35211.0`。`vcruntime140_cor3.dll` 是原自包含 .NET 运行时已有组件，不计为本次新增 CRT；Rust helper 仍使用静态 CRT。
+- ARM64 runner 的 OS / 进程架构均为 `Arm64`，系统版本 `10.0.26200`，运行时 `.NET 10.0.12`。实际从解压后的完整发布包路径加载 ONNX Runtime、SkiaSharp 及上述 CRT，共记录 6 个 native 模块的路径、SHA-256 与 `0xAA64` machine，避免 runner 预装运行库掩盖随包依赖缺失。
+- 使用发布包内真实插件及宿主 SDK 加载器，在线下载并校验四个模型文件，成功识别“中文翻译测试”和“Windows ARM64 OCR”，返回原图坐标四点；下载失败 / 取消 / 重试、损坏缓存修复、缓存后的离线识别、预取消、ONNX Runtime 运行中 terminate 取消及后续请求恢复、双实例并发、释放后拒绝新请求全部通过。
+
+公开发行产物包含 [原生依赖来源报告 `arm64-ocr-provenance.json`](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-provenance.json) 与 [真实 ARM64 运行报告 `arm64-ocr-validation.json`](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/arm64-ocr-validation.json)。运行报告绑定以上源码提交、CI run 和完整包 SHA-256 `1702b09bbb9177ad6fb5f57dde5b8e3ebaf4eab097dec68e99fa6feb112e2070`，只验证该完整包中的插件及 native OCR，不涵盖 Setup 交互安装或 WPF 桌面流程。
+
 真实 Windows ARM64 设备应验证：
 
 1. 安装器安装、启动及进程架构，确认主程序和 helper 都为 ARM64。
@@ -63,4 +74,4 @@ cargo build --manifest-path src/STranslate.Host/Cargo.toml --release --locked --
 5. DeepL 实际翻译，安装社区 MiMo TTS 插件并播放它返回的音频。
 6. 从较早的 ARM64 安装版本检查更新、下载、退出替换并重启，确认配置、历史和社区插件保留，且始终使用 ARM64 包。
 
-这些检查未通过前，只能宣称源码 / 包架构与构建流程适配完成，不能宣称设备上的全部功能已经验证。
+真实 ARM64 runner 已执行内置 OCR，并不意味着以上桌面、设备驱动、真实 API 或 `Update.exe` 退出替换与重启流程已经验证；这些项目仍须在用户设备上检查。
