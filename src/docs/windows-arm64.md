@@ -119,6 +119,8 @@ git push origin arm64-v2.0.11-arm64.1
 
 发布后已用生产 `UpdateFeedPolicy` 与 Velopack 默认 `HttpClientFileDownloader` 实际读取公开 latest feed，再从固定 `arm64-v2.0.10-arm64.4` tag 下载 `15918560` 字节的 delta，SHA-256 `265ce58b94a772ab63b9507bfa62d41b8131b4437a389454277f38e43cd4a6ce` 与 feed 一致。此检查无需 token，也没有使用自定义 TLS / HTTP handler；它验证公开更新发现与下载链路，未运行 Windows ARM64 `Update.exe` 的退出替换与重启。
 
+公开下载后再次独立核验：Setup 的 SHA-256 为 `7c4ae1037c91f1b7d56b466e729cdfefe27ae3261351f7945fb3136d03e6fda7`；本版 full 的 718 个 PE 由 192 个 ARM64 PE 和 526 个 AnyCPU 程序集组成，21 个内置插件完整，逐项检查 ZIP 内容没有模型权重或字符字典。将生产更新策略源码纳入测试的公开快照回放共 22 项全部通过，包括 19 项策略测试和 3 项真实快照检查：`arm64.3` 真实 full 选择本版 delta、本版无更新、`arm64.1` 缺少本地基准时选择本版 full，全过程零 GitHub API 调用；这不改变旧版自身仍使用匿名 API 的限制，也不代替设备上的退出替换与重启。
+
 完整 Windows 构建与发布结果以 workflow 成功产物为准，必须通过 Setup、全量包、便携包和 OTA 元数据的完整检查。Windows ARM64 runner 可以验证插件和原生 OCR；云端尚未完成 Setup 交互安装、WPF 桌面流程、系统音频播放或 OTA 退出替换与重启，不能将这些流程写为已通过。
 
 MSVC 的 ARM64 开发环境会设置 `Platform=arm64`，因此 workflow 中运行 x64 测试时显式传入 `Platform=AnyCPU`，避免 .NET SDK 将测试程序集也判定为 ARM64。主程序发布同样显式设置 AnyCPU，原生进程架构由 `win-arm64` apphost 和运行时决定。不要把未经完整架构和安装包校验的编译目录上传为正式 ARM64 发行版。
