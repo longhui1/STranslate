@@ -32,10 +32,12 @@
 | RapidOcrNet | `4.2.0`，Apache-2.0，NuGet 包中的许可和上游归属随插件提供 |
 | ONNX Runtime | `Microsoft.ML.OnnxRuntime 1.29.0`，官方 `win-arm64` native 资产，CPU 推理 |
 | 图像处理 | `SkiaSharp 3.119.1` 与官方 Win32 native 包中的 `win-arm64/libSkiaSharp.dll` |
-| VC++ 运行库 | 从 Visual Studio 官方 ARM64 Redist 文件夹取得所需 app-local DLL，随包提供并记录哈希，用户无需额外安装 |
+| VC++ 运行库 | 从 Visual Studio 官方 ARM64 Redist 文件夹按导入表递归取得实际所需的 app-local DLL，随包提供并记录哈希，用户无需额外安装 |
 | 模型 | PP-OCRv6 Small det / rec 与兼容的 PP-LCNet 文本行方向分类器；字符字典必须与 rec 模型匹配 |
 
 每个模型下载后同时检查固定大小与 SHA-256，临时文件校验成功后才替换缓存正式文件。使用固定模型清单，避免可变 URL 后续换内容而静默加载不同模型。模型与推理库的许可证、来源和具体哈希以源码清单及发布 provenance 为准。
+
+Visual Studio ARM64 Redist 目录可能附带其他兼容组件，因此只从 OCR native DLL 的导入表出发，递归复制其 CRT 依赖闭包；不复制整个 Redist 目录。所有选中的 native DLL 仍须严格通过 ARM64 PE 校验，并在 ARM64 runner 上证明实际从发布包加载，避免无关兼容组件污染程序目录。
 
 NuGet 的 ONNX Runtime build props 会按 AnyCPU 默认选择 x64 Content，因此仅对 OCR 项目排除该包的 build / buildTransitive 资产，并排除 RapidOcrNet 的默认 v5 模型复制资产，由 .NET 的 RID 解析选择 `win-arm64`；完整 PE 校验仍是发布前置条件。托管 SDK 继续维持 `AssemblyVersion=1.0.0.0`，避免影响 MiMo 等已有插件。
 

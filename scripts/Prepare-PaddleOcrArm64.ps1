@@ -17,8 +17,10 @@ function Get-NativeInfo([string]$Path) {
     $pe = [Reflection.PortableExecutable.PEReader]::new($stream)
     try {
         $headers = $pe.PEHeaders
-        if ([int]$headers.CoffHeader.Machine -ne 0xaa64 -or $null -ne $headers.CorHeader) {
-            throw "OCR 原生依赖必须是 ARM64 native DLL：$Path"
+        $machine = [int]$headers.CoffHeader.Machine
+        $isManaged = $null -ne $headers.CorHeader
+        if ($machine -ne 0xaa64 -or $isManaged) {
+            throw "OCR 原生依赖必须是 ARM64 native DLL：$Path（Machine=0x$($machine.ToString('x4'))，Managed=$isManaged）"
         }
         $imports = @()
         $directory = $headers.PEHeader.ImportTableDirectory
@@ -95,18 +97,38 @@ $crtSources = @(Get-ChildItem $CrtDirectory -File -Filter '*.dll' | Sort-Object 
 foreach ($required in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll')) {
     if ($required -notin $crtSources.Name) { throw "ARM64 Redist 文件夹缺少 $required。" }
 }
+$crtSourcesByName = @{}
+foreach ($source in $crtSources) { $crtSourcesByName[$source.Name] = $source }
+$crtDependencyPattern = '^(MSVCP|VCRUNTIME|CONCRT|VCOMP|VCCORLIB)\d.*\.dll$'
+$pendingCrt = [Collections.Generic.Queue[string]]::new()
+foreach ($file in $nativeFiles) {
+    foreach ($dependency in $file.Imports | Where-Object { $_ -match $crtDependencyPattern }) {
+        $pendingCrt.Enqueue($dependency)
+    }
+}
+$selectedCrt = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $crtFiles = @()
-foreach ($source in $crtSources) {
-    $null = Get-NativeInfo $source.FullName
+# 官方 arm64 Redist 也可能附带供其他 ABI 使用的兼容组件。只部署实际原生
+# 推理组件所需的递归 import 闭包，不把无关的 ARM64EC / x64 文件带进应用。
+while ($pendingCrt.Count -gt 0) {
+    $dependency = $pendingCrt.Dequeue()
+    if (-not $selectedCrt.Add($dependency)) { continue }
+    if (-not $crtSourcesByName.ContainsKey($dependency)) { throw "OCR app-local CRT 依赖未闭合：$dependency" }
+    $source = $crtSourcesByName[$dependency]
+    $info = Get-NativeInfo $source.FullName
     $destination = Join-Path $AppDirectory $source.Name
     Copy-Item $source.FullName $destination -Force
     $crtFiles += Get-NativeInfo $destination
+    Write-Host "OCR app-local CRT：$($source.Name)，Machine=0xaa64，Version=$($info.FileVersion)"
+    foreach ($nestedDependency in $info.Imports | Where-Object { $_ -match $crtDependencyPattern }) {
+        $pendingCrt.Enqueue($nestedDependency)
+    }
 }
 
 # 检查 ORT 及 CRT 的依赖闭包；UCRT / Windows API DLL 由 Windows 本身提供。
 foreach ($file in @($nativeFiles) + @($crtFiles)) {
-    foreach ($dependency in $file.Imports | Where-Object { $_ -match '^(MSVCP|VCRUNTIME|CONCRT|VCOMP|VCCORLIB)\d.*\.dll$' }) {
-        if ($dependency -notin $crtSources.Name) { throw "OCR app-local CRT 依赖未闭合：$($file.FileName) -> $dependency" }
+    foreach ($dependency in $file.Imports | Where-Object { $_ -match $crtDependencyPattern }) {
+        if (-not $selectedCrt.Contains($dependency)) { throw "OCR app-local CRT 依赖未闭合：$($file.FileName) -> $dependency" }
     }
 }
 
@@ -166,6 +188,7 @@ $report = [ordered]@{
     Crt = [ordered]@{
         Vendor = 'Microsoft Visual Studio'
         Distribution = 'app-local Microsoft.VC143.CRT ARM64'
+        Selection = 'native-import-closure'
         RedistVersion = [IO.Directory]::GetParent([IO.Directory]::GetParent($CrtDirectory).FullName).Name
         LicenseReference = 'https://learn.microsoft.com/visualstudio/releases/2022/redistribution'
         Files = $crtFiles

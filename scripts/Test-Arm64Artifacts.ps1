@@ -120,7 +120,8 @@ function Assert-PaddleOcr([string]$Directory) {
     foreach ($required in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll')) {
         if ($required -notin $crtNames) { throw "OCR 缺少 app-local ARM64 CRT：$required" }
     }
-    if ($report.Crt.Vendor -ne 'Microsoft Visual Studio' -or $report.Crt.Distribution -ne 'app-local Microsoft.VC143.CRT ARM64') {
+    if ($report.Crt.Vendor -ne 'Microsoft Visual Studio' -or $report.Crt.Distribution -ne 'app-local Microsoft.VC143.CRT ARM64' -or
+        $report.Crt.Selection -ne 'native-import-closure') {
         throw 'OCR CRT 必须来自 Visual Studio 官方 ARM64 Redist。'
     }
     foreach ($name in $crtNames) {
