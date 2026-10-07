@@ -13,6 +13,9 @@ public class PluginManager : IDisposable
 {
     private const string WeChatOcrPluginId = "3410e7de989340938301abd6fcf8cc4b";
     private const string UnsupportedWeChatOcrMessage = "微信内置 OCR 不支持原生 Windows ARM64，此版本已禁用该插件。";
+    private const string OfficialPaddleOcrPluginId = "c5914774d4854623ad11912676c7007b";
+    private const string CommunityPaddleV6PluginId = "26b37788a09c4999a296255eb0c95129";
+    private const string UnsupportedPaddleOcrMessage = "此社区 PaddleOCR 包使用 x64 原生组件。请使用本版本内置的 PaddleOCR V6 (ARM64) 插件。";
     private readonly ILogger<PluginManager> _logger;
     private readonly List<PluginMetaData> _pluginMetaDatas;
     private readonly string _tempExtractPath;
@@ -87,11 +90,12 @@ public class PluginManager : IDisposable
                 return PluginInstallResult.Fail(message);
             }
 
-            if (!IsPluginSupported(metaData.PluginID, RuntimeInformation.ProcessArchitecture))
+            var unsupportedMessage = GetUnsupportedPluginMessage(metaData.PluginID, RuntimeInformation.ProcessArchitecture);
+            if (unsupportedMessage is not null)
             {
                 isError = true;
-                _logger.LogWarning("{PluginName}: {Message}", metaData.Name, UnsupportedWeChatOcrMessage);
-                return PluginInstallResult.Fail(UnsupportedWeChatOcrMessage);
+                _logger.LogWarning("{PluginName}: {Message}", metaData.Name, unsupportedMessage);
+                return PluginInstallResult.Fail(unsupportedMessage);
             }
 
             var existPluginMetaData = _pluginMetaDatas.FirstOrDefault(x => x.PluginID == metaData.PluginID);
@@ -231,9 +235,10 @@ public class PluginManager : IDisposable
         var results = new List<PluginLoadResult>();
         foreach (var metaData in uniqueList)
         {
-            if (!IsPluginSupported(metaData.PluginID, RuntimeInformation.ProcessArchitecture))
+            var unsupportedMessage = GetUnsupportedPluginMessage(metaData.PluginID, RuntimeInformation.ProcessArchitecture);
+            if (unsupportedMessage is not null)
             {
-                _logger.LogWarning("跳过插件 {PluginName}: {Message}", metaData.Name, UnsupportedWeChatOcrMessage);
+                _logger.LogWarning("跳过插件 {PluginName}: {Message}", metaData.Name, unsupportedMessage);
                 continue;
             }
 
@@ -248,8 +253,19 @@ public class PluginManager : IDisposable
 
     // 按进程架构判断，保留官方 x64 进程在 Windows on ARM 上的既有行为。
     internal static bool IsPluginSupported(string pluginId, Architecture processArchitecture)
-        => processArchitecture != Architecture.Arm64 ||
-           !string.Equals(pluginId, WeChatOcrPluginId, StringComparison.OrdinalIgnoreCase);
+        => GetUnsupportedPluginMessage(pluginId, processArchitecture) is null;
+
+    internal static string? GetUnsupportedPluginMessage(string pluginId, Architecture processArchitecture)
+    {
+        if (processArchitecture != Architecture.Arm64)
+            return null;
+        if (string.Equals(pluginId, WeChatOcrPluginId, StringComparison.OrdinalIgnoreCase))
+            return UnsupportedWeChatOcrMessage;
+        if (string.Equals(pluginId, OfficialPaddleOcrPluginId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(pluginId, CommunityPaddleV6PluginId, StringComparison.OrdinalIgnoreCase))
+            return UnsupportedPaddleOcrMessage;
+        return null;
+    }
 
     private PluginLoadResult LoadPluginPairFromMetaData(PluginMetaData metaData)
     {

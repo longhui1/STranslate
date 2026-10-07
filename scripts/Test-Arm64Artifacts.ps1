@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][string]$AppDirectory,
+    [string]$AppDirectory,
     [string]$ReleaseDirectory,
     [Parameter(Mandatory)][string]$Version
 )
@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Add-Type -AssemblyName System.Reflection.Metadata
+if (-not $AppDirectory -and -not $ReleaseDirectory) { throw '必须指定 AppDirectory 或 ReleaseDirectory。' }
 
 function Get-PeImageInfo([string]$Path) {
     $stream = [IO.File]::OpenRead($Path)
@@ -52,6 +53,104 @@ function Assert-NativeArm64([string]$Path, [switch]$RequireStaticCrt) {
     return $info
 }
 
+function Assert-PaddleOcr([string]$Directory) {
+    $pluginName = 'STranslate.Plugin.Ocr.PaddleV6Arm64'
+    $pluginDirectory = Join-Path $Directory "Plugins/$pluginName"
+    foreach ($name in @('plugin.json', "$pluginName.dll", "$pluginName.deps.json", 'model-manifest.json', 'RapidOcrNet.dll', 'Microsoft.ML.OnnxRuntime.dll', 'SkiaSharp.dll', 'LICENSE-RapidOcrNet.txt', 'NOTICE.txt')) {
+        if (-not (Test-Path (Join-Path $pluginDirectory $name) -PathType Leaf)) { throw "内置 ARM64 OCR 资源缺失：$name" }
+    }
+    $metadata = Get-Content (Join-Path $pluginDirectory 'plugin.json') -Raw | ConvertFrom-Json
+    if ($metadata.PluginID -ne 'c67c0e3de45b48f6a852ffa8f0aae2f2' -or $metadata.ExecuteFileName -ne "$pluginName.dll") {
+        throw '内置 ARM64 OCR 插件身份错误。'
+    }
+    $modelFiles = @(Get-ChildItem $pluginDirectory -Recurse -File |
+        Where-Object { $_.Extension -in @('.onnx', '.ort') -or $_.Name -match '^(ppocr.*(dict|keys).*\.txt|.*_dict\.txt)$' })
+    $modelDirectories = @(Get-ChildItem $pluginDirectory -Recurse -Directory | Where-Object Name -Match '^models?$')
+    if ($modelFiles.Count -ne 0 -or $modelDirectories.Count -ne 0) { throw 'OCR 模型必须在线下载，发布包不能包含模型或字符字典。' }
+
+    $manifestPath = Join-Path $pluginDirectory 'model-manifest.json'
+    $sourceManifest = Join-Path $PSScriptRoot "../src/Arm64/Plugins/$pluginName/model-manifest.json"
+    $manifestHash = (Get-FileHash $manifestPath -Algorithm SHA256).Hash
+    if ($manifestHash -ne (Get-FileHash $sourceManifest -Algorithm SHA256).Hash) { throw '打包的 OCR 模型清单与固定源码不一致。' }
+    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.schemaVersion -ne 1 -or $manifest.family -ne 'PP-OCRv6-small' -or $manifest.license -ne 'Apache-2.0' -or
+        $manifest.provenance.rapidOcrNetVersion -ne '4.2.0' -or $manifest.provenance.modelMirrorRepository -ne 'BobLd/RapidOcrNet' -or
+        $manifest.provenance.rapidOcrNetSourceCommit -notmatch '^[0-9a-f]{40}$' -or $manifest.provenance.modelMirrorCommit -notmatch '^[0-9a-f]{40}$' -or
+        @($manifest.files).Count -ne 4) { throw 'OCR 在线模型清单的 schema、Small 模型身份或固定来源错误。' }
+    $fileNames = @{
+        det = 'PP-OCRv6_det_small.onnx'; cls = 'ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx'
+        rec = 'PP-OCRv6_rec_small.onnx'; dict = 'ppocrv6_dict.txt'
+    }
+    foreach ($role in @('det', 'cls', 'rec', 'dict')) {
+        $entry = @($manifest.files | Where-Object role -EQ $role)
+        if ($entry.Count -ne 1 -or $entry[0].fileName -ne $fileNames[$role] -or $entry[0].size -le 0 -or
+            $entry[0].sha256 -notmatch '^[0-9a-f]{64}$' -or @($entry[0].urls).Count -lt 1) { throw "模型清单缺少固定文件、大小或 SHA-256：$role" }
+        foreach ($url in $entry[0].urls) {
+            $uri = [uri]$url
+            if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne 'https' -or $uri.UserInfo) { throw "模型下载 URL 非法：$url" }
+        }
+        $mirrorPrefix = "https://raw.githubusercontent.com/BobLd/RapidOcrNet/$($manifest.provenance.modelMirrorCommit)/"
+        if (@($entry[0].urls | Where-Object { $_.StartsWith($mirrorPrefix, [StringComparison]::Ordinal) }).Count -eq 0) {
+            throw "模型清单缺少固定 commit 的下载后备地址：$role"
+        }
+    }
+    $deps = Get-Content (Join-Path $pluginDirectory "$pluginName.deps.json") -Raw | ConvertFrom-Json
+    $packageNames = @($deps.libraries.PSObject.Properties.Name)
+    foreach ($required in @('RapidOcrNet/4.2.0', 'Microsoft.ML.OnnxRuntime/1.29.0', 'Microsoft.ML.OnnxRuntime.Managed/1.29.0', 'SkiaSharp/3.119.1', 'SkiaSharp.NativeAssets.Win32/3.119.1')) {
+        if ($required -notin $packageNames) { throw "OCR 依赖版本错误：$required" }
+    }
+
+    $report = Get-Content (Join-Path $Directory 'arm64-ocr-provenance.json') -Raw | ConvertFrom-Json
+    if ($report.SchemaVersion -ne 1 -or $report.Plugin -ne $pluginName -or $report.Backend.RapidOcrNet -ne '4.2.0' -or
+        $report.Backend.OnnxRuntime -ne '1.29.0' -or $report.Backend.SkiaSharp -ne '3.119.1' -or
+        $report.Backend.Provider -ne 'CPU' -or $report.Backend.Architecture -ne 'win-arm64' -or
+        $report.Models.Policy -ne 'download-on-demand' -or $report.Models.ManifestFile -ne "Plugins/$pluginName/model-manifest.json" -or
+        $report.Models.ManifestSHA256 -ne $manifestHash -or $report.Models.Family -ne $manifest.family -or $report.Models.License -ne $manifest.license -or
+        $report.Models.Provenance.modelMirrorCommit -ne $manifest.provenance.modelMirrorCommit -or
+        (($report.Models.Files | ConvertTo-Json -Depth 10 -Compress) -ne ($manifest.files | ConvertTo-Json -Depth 10 -Compress))) {
+        throw 'OCR provenance 的后端、架构或在线模型清单身份错误。'
+    }
+    $expectedNative = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'libSkiaSharp.dll') |
+        ForEach-Object { "Plugins/$pluginName/$_" }
+    if (@($report.NativeFiles).Count -ne $expectedNative.Count -or
+        (@($report.NativeFiles.FileName | Sort-Object) -join '|') -ne (@($expectedNative | Sort-Object) -join '|')) {
+        throw 'OCR provenance 缺少必须的 ARM64 native 组件。'
+    }
+    $crtNames = @($report.Crt.Files.FileName)
+    foreach ($required in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll')) {
+        if ($required -notin $crtNames) { throw "OCR 缺少 app-local ARM64 CRT：$required" }
+    }
+    if ($report.Crt.Vendor -ne 'Microsoft Visual Studio' -or $report.Crt.Distribution -ne 'app-local Microsoft.VC143.CRT ARM64') {
+        throw 'OCR CRT 必须来自 Visual Studio 官方 ARM64 Redist。'
+    }
+    foreach ($name in $crtNames) {
+        if ($name -ne [IO.Path]::GetFileName($name) -or $name -notmatch '^(MSVCP|VCRUNTIME|CONCRT|VCOMP|VCCORLIB)\d.*\.dll$') {
+            throw "OCR CRT 记录含非法路径或无关文件：$name"
+        }
+    }
+    foreach ($file in @($report.NativeFiles) + @($report.Crt.Files)) {
+        $path = Join-Path $Directory $file.FileName
+        $info = Assert-NativeArm64 $path
+        if ($file.Machine -ne 'ARM64' -or $info.AnyCpu -or (Get-Item $path).Length -ne $file.Size -or
+            (Get-FileHash $path -Algorithm SHA256).Hash -ne $file.SHA256 -or
+            (@($info.Imports | Sort-Object -Unique) -join '|') -ne (@($file.Imports | Sort-Object -Unique) -join '|')) {
+            throw "OCR native / CRT provenance 与文件不符：$($file.FileName)"
+        }
+        foreach ($dependency in $info.Imports | Where-Object { $_ -match '^(MSVCP|VCRUNTIME|CONCRT|VCOMP|VCCORLIB)\d.*\.dll$' }) {
+            if ($dependency -notin $crtNames) { throw "OCR ARM64 CRT 依赖不完整：$($file.FileName) -> $dependency" }
+        }
+    }
+    $noticeNames = @('ONNXRuntime-LICENSE.txt', 'ONNXRuntime-ThirdPartyNotices.txt', 'SkiaSharp-LICENSE.txt', 'SkiaSharp-ThirdPartyNotices.txt') |
+        ForEach-Object { "Plugins/$pluginName/licenses/$_" }
+    if (@($report.Notices).Count -ne $noticeNames.Count -or
+        (@($report.Notices.FileName | Sort-Object) -join '|') -ne (@($noticeNames | Sort-Object) -join '|')) { throw 'OCR 缺少 native 组件的许可及第三方归属通知。' }
+    foreach ($notice in $report.Notices) {
+        $path = Join-Path $Directory $notice.FileName
+        if ((Get-Item $path).Length -le 0 -or (Get-Item $path).Length -ne $notice.Size -or
+            (Get-FileHash $path -Algorithm SHA256).Hash -ne $notice.SHA256) { throw "OCR 许可文件哈希不符：$($notice.FileName)" }
+    }
+}
+
 function Assert-AppTree([string]$Directory) {
     foreach ($name in @('STranslate.exe', 'z_stranslate_host.exe', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'wpfgfx_cor3.dll', 'e_sqlite3.dll')) {
         $null = Assert-NativeArm64 (Join-Path $Directory $name)
@@ -77,15 +176,16 @@ function Assert-AppTree([string]$Directory) {
             if (-not (Test-Path (Join-Path $pluginPath $name))) { throw "内置插件资源缺失：$pluginPath/$name" }
         }
     }
+    Assert-PaddleOcr $Directory
     $actualVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $Directory 'STranslate.dll')).Version
     $expectedVersion = [version]$Version.Replace('-arm64.', '.')
     if ($actualVersion -ne $expectedVersion) { throw "主程序集版本错误：需要 $Version，实际 $actualVersion。" }
     $sdkVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $Directory 'STranslate.Plugin.dll')).Version
     if ($sdkVersion -ne [version]'1.0.0.0') { throw "插件 SDK 程序集标识改变：需要 1.0.0.0，实际 $sdkVersion；现有社区插件可能无法加载。" }
-    Write-Host "ARM64 程序验证通过：$($peFiles.Count) 个 PE 文件，$(@($expectedPlugins).Count) 个内置插件。"
+    Write-Host "ARM64 程序验证通过：$($peFiles.Count) 个 PE 文件，$(@($expectedPlugins).Count + 1) 个内置插件；OCR native、CRT 与在线模型清单通过。"
 }
 
-Assert-AppTree $AppDirectory
+if ($AppDirectory) { Assert-AppTree $AppDirectory }
 if (-not $ReleaseDirectory) { return }
 
 $packageId = 'STranslate-ARM64'
@@ -132,6 +232,10 @@ try {
     $packageDirectory = Join-Path $temporaryDirectory 'package'
     $null = Assert-NativeArm64 (Join-Path $packageDirectory 'lib/app/Squirrel.exe') -RequireStaticCrt
     Assert-AppTree (Join-Path $packageDirectory 'lib/app')
+    if ((Get-FileHash (Join-Path $packageDirectory 'lib/app/arm64-ocr-provenance.json') -Algorithm SHA256).Hash -ne
+        (Get-FileHash (Join-Path $ReleaseDirectory 'arm64-ocr-provenance.json') -Algorithm SHA256).Hash) {
+        throw '公开 OCR provenance 与实际安装包不同。'
+    }
     [xml]$nuspec = Get-Content (Join-Path $packageDirectory "$packageId.nuspec") -Raw
     if ($nuspec.package.metadata.id -ne $packageId -or $nuspec.package.metadata.version -ne $Version -or $nuspec.package.metadata.rid -ne 'win-arm64' -or
         $nuspec.package.metadata.channel -ne 'win-arm64' -or $nuspec.package.metadata.machineArchitecture -ne 'arm64') {

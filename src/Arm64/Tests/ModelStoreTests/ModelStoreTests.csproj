@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 直接验证生产缓存实现；不引用 WPF 或原生 OCR，Linux 与 Windows CI 均可执行。 -->
+    <Compile Include="..\..\Plugins\STranslate.Plugin.Ocr.PaddleV6Arm64\ModelStore.cs" Link="ModelStore.cs" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

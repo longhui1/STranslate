@@ -1,6 +1,6 @@
 # Windows ARM64 原生依赖审计
 
-本说明记录第一阶段的非插件依赖、原生辅助程序及实机验证边界。发布流程见 [Windows ARM64 维护与发布](windows-arm64.md)，插件说明见 [ARM64 插件兼容性](arm64-plugin-compatibility.md)。插件适配不要求修改这些通用依赖；微信 OCR 和 PaddleOCR / PP-OCRv6 不作为第一阶段交付条件。
+本说明记录第一阶段的非插件依赖、原生辅助程序及实机验证边界。发布流程见 [Windows ARM64 维护与发布](windows-arm64.md)，插件说明见 [ARM64 插件兼容性](arm64-plugin-compatibility.md)。插件适配不要求修改这些通用依赖；微信 OCR 和 PaddleOCR / PP-OCRv6 不作为第一阶段交付条件。`arm64.4` 增加原生 ARM64 ONNX Runtime / SkiaSharp 和 app-local CRT，供内置 V6 OCR 使用；模型按用户要求在线下载，详见 [OCR 维护文档](windows-arm64-paddleocr.md)。
 
 ## 架构判断方法
 
@@ -19,6 +19,7 @@
 | 热键与鼠标钩子 | `ChefKeys 0.1.2`、`MouseKeyHook 5.7.1`、`NHotkey 4.0.0` 和 `H.InputSimulator 1.5.0` 为 AnyCPU 托管 DLL；应用的低级鼠标钩子使用 CsWin32 生成的句柄 / 结构，窗口指针适配使用 `nint` 与 `sizeof(nint)` | 保留 Win32 实现；实机分别验证原生 ARM64 与模拟 x64 应用中的热键、Ctrl+CC、鼠标划词和前台激活 |
 | 托盘与通知 | `Hardcodet.NotifyIcon.Wpf 2.0.1`、`Microsoft.Toolkit.Uwp.Notifications 7.1.3` 为 AnyCPU 托管 DLL，CLR flags 为 `0x9`；调用系统托盘、WinRT / COM 通知 API | 保留上游实现；验证托盘菜单、通知展示和点击回调，尤其验证安装 / OTA 后的可执行文件路径变化 |
 | Win32 调用 | 本仓库显式 `DllImport` 指向 `user32.dll`、`shcore.dll` 等系统 DLL；CsWin32 负责其他系统 API 声明，未发现应用自行加载其他 x64 native DLL | 使用 ARM64 Windows 自带系统组件；保留调用代码并执行真机功能检查 |
+| 内置 PaddleOCR V6 (ARM64) | RapidOcrNet 4.2.0 + 官方 ONNX Runtime 1.29.0 / SkiaSharp 3.119.1；模型首次在线下载 | RID 选择原生 ARM64，附官方 app-local ARM64 CRT；包内不预装模型，由 Windows ARM64 runner 实际识别后发布 |
 | Velopack | 独立更新器 / 安装器是发布工具生成的 native 组件，不属于主程序托管 DLL | 必须用 ARM64 打包目标和独立 ARM64 更新频道；架构及 OTA 验证由发布流程负责 |
 
 `ScreenGrab` 的 NuGet 元数据指向上游 [ZGGSONG/ScreenGrab](https://github.com/ZGGSONG/ScreenGrab)，1.0.17 对应提交 `9acf5b25278c9f27c6372d0477de63b077d6e416`。保持此依赖可直接跟随官方版本，不需要额外 ARM64 fork。

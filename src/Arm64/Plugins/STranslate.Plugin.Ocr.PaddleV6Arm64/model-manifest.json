@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "family": "PP-OCRv6-small",
+  "license": "Apache-2.0",
+  "provenance": {
+    "rapidOcrNetVersion": "4.2.0",
+    "rapidOcrNetSourceCommit": "708cae2fcb88720e1d891a81b5ee3e8b2bcc139e",
+    "modelSource": "RapidAI/RapidOCR ModelScope v3.9.2; exact-byte GitHub fallback",
+    "modelMirrorRepository": "BobLd/RapidOcrNet",
+    "modelMirrorCommit": "708cae2fcb88720e1d891a81b5ee3e8b2bcc139e"
+  },
+  "files": [
+    {
+      "role": "det",
+      "fileName": "PP-OCRv6_det_small.onnx",
+      "size": 9929594,
+      "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
+      "urls": [
+        "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx",
+        "https://raw.githubusercontent.com/BobLd/RapidOcrNet/708cae2fcb88720e1d891a81b5ee3e8b2bcc139e/RapidOcrNet/models/v6/PP-OCRv6_det_small.onnx"
+      ]
+    },
+    {
+      "role": "cls",
+      "fileName": "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx",
+      "size": 1018508,
+      "sha256": "54379ae5174d026780215fc748a7f31910dee36818e63d49e17dc598ecc82df7",
+      "urls": [
+        "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/cls/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx",
+        "https://raw.githubusercontent.com/BobLd/RapidOcrNet/708cae2fcb88720e1d891a81b5ee3e8b2bcc139e/RapidOcrNet/models/v5/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx"
+      ]
+    },
+    {
+      "role": "rec",
+      "fileName": "PP-OCRv6_rec_small.onnx",
+      "size": 21234383,
+      "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+      "urls": [
+        "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx",
+        "https://raw.githubusercontent.com/BobLd/RapidOcrNet/708cae2fcb88720e1d891a81b5ee3e8b2bcc139e/RapidOcrNet/models/v6/PP-OCRv6_rec_small.onnx"
+      ]
+    },
+    {
+      "role": "dict",
+      "fileName": "ppocrv6_dict.txt",
+      "size": 74947,
+      "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
+      "urls": [
+        "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/paddle/PP-OCRv6/rec/PP-OCRv6_rec_small/ppocrv6_dict.txt",
+        "https://raw.githubusercontent.com/BobLd/RapidOcrNet/708cae2fcb88720e1d891a81b5ee3e8b2bcc139e/RapidOcrNet/models/v6/ppocrv6_dict.txt"
+      ]
+    }
+  ]
+}

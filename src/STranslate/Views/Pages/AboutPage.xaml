@@ -163,8 +163,8 @@
                 </ui:SettingsCard>
 
                 <ui:SettingsExpander
-                    Description="© 2020 zggsong &amp; STranslate Contributors"
-                    Header="{x:Static core:Constant.AppName}"
+                    Description="{Binding Attribution}"
+                    Header="{Binding ApplicationName}"
                     IsExpanded="True">
                     <ui:SettingsExpander.HeaderIcon>
                         <Image
@@ -192,18 +192,26 @@
                                 <Button Command="{Binding OpenWizardCommand}">
                                     <ui:IconAndText Content="{DynamicResource Wizard}" Icon="{x:Static ui:FluentSystemIcons.PlayMultiple_16_Regular}" />
                                 </Button>
-                                <Button Command="{Binding DonateCommand}" Style="{DynamicResource {x:Static ui:ThemeKeys.AccentButtonStyleKey}}">
-                                    <ui:IconAndText Content="{DynamicResource Donate}" Icon="{x:Static ui:FluentSystemIcons.DrinkCoffee_20_Filled}" />
-                                </Button>
                             </ikw:SimpleStackPanel>
                         </ui:SettingsCard>
 
                         <ui:SettingsCard Margin="0,0,-10,0" Header="{DynamicResource Website}">
                             <ikw:SimpleStackPanel Orientation="Horizontal" Spacing="2">
-                                <ui:HyperlinkButton Content="{DynamicResource OfficialWebsite}" NavigateUri="{x:Static core:Constant.WebsiteUri}" />
-                                <ui:HyperlinkButton Content="{DynamicResource Group}" NavigateUri="{x:Static core:Constant.GroupUri}" />
-                                <ui:HyperlinkButton Content="Github" NavigateUri="{x:Static core:Constant.GithubUri}" />
-                                <ui:HyperlinkButton Content="Issue" NavigateUri="{x:Static core:Constant.ReportUri}" />
+                                <ui:HyperlinkButton
+                                    Content="{DynamicResource OfficialWebsite}"
+                                    NavigateUri="{x:Static core:Constant.WebsiteUri}"
+                                    Visibility="{Binding IsArm64Version, Converter={cnvt:BoolToVisibilityInverseConverter}}" />
+                                <ui:HyperlinkButton
+                                    Content="{DynamicResource Group}"
+                                    NavigateUri="{x:Static core:Constant.GroupUri}"
+                                    Visibility="{Binding IsArm64Version, Converter={cnvt:BoolToVisibilityInverseConverter}}" />
+                                <ui:HyperlinkButton Content="{DynamicResource PluginActionWebsite}" NavigateUri="{Binding ProjectUri}" />
+                                <ui:HyperlinkButton Content="Issue" NavigateUri="{Binding IssueUri}" />
+                                <ui:HyperlinkButton Content="Releases" NavigateUri="{Binding ReleaseNotesUri}" />
+                                <ui:HyperlinkButton
+                                    Content="{Binding MaintainerName}"
+                                    NavigateUri="{Binding MaintainerUri}"
+                                    Visibility="{Binding IsArm64Version, Converter={cnvt:BoolToVisibilityConverter}}" />
                             </ikw:SimpleStackPanel>
                         </ui:SettingsCard>
 

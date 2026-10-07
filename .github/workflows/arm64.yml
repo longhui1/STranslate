@@ -17,14 +17,14 @@ on:
       version:
         description: 'ARM64 版本（如 2.0.10-arm64.1，发布后只能递增）'
         required: true
-        default: '2.0.10-arm64.1'
+        default: '2.0.10-arm64.4'
       publish:
         description: '发布正式 ARM64 GitHub Release'
         type: boolean
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: arm64-${{ (startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true) && 'release' || github.ref }}
@@ -34,6 +34,9 @@ jobs:
   build:
     runs-on: windows-2022
     timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-dotnet@v5
@@ -56,7 +59,7 @@ jobs:
           } elseif ($env:INPUT_VERSION) {
             $env:INPUT_VERSION
           } else {
-            '2.0.10-arm64.1'
+            '2.0.10-arm64.4'
           }
           if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-arm64\.([1-9]\d*)$') {
             throw 'ARM64 版本必须为上游三段版本加修订号，例如 2.0.10-arm64.1，数字不得有前导零。'
@@ -110,6 +113,11 @@ jobs:
             }
             $page++
           } while ($releases.Count -eq 100)
+      - name: Verify online model cache policies
+        shell: pwsh
+        run: |
+          dotnet test src/Arm64/Tests/ModelStoreTests/ModelStoreTests.csproj -c Release -p:Platform=AnyCPU
+          if ($LASTEXITCODE -ne 0) { throw '在线模型缓存、校验、取消和并发测试失败。' }
       - name: Verify update and plugin policies
         shell: pwsh
         run: |
@@ -128,13 +136,84 @@ jobs:
           path: publish/arm64/*
           if-no-files-found: error
           retention-days: 30
+
+  arm-smoke:
+    needs: build
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          architecture: arm64
+      - name: Download the validated ARM64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: STranslate-arm64-${{ needs.build.outputs.version }}
+          path: publish/arm64
+      - name: Run the packaged OCR plugin on Windows ARM64
+        shell: pwsh
+        env:
+          ARM64_VERSION: ${{ needs.build.outputs.version }}
+        run: ./scripts/Test-PaddleOcrArm64.ps1 -ReleaseDirectory ./publish/arm64 -Version $env:ARM64_VERSION -ReportDirectory ./publish/arm64-ocr-validation
+      - name: Upload the ARM64 execution report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: STranslate-arm64-ocr-validation-${{ needs.build.outputs.version }}
+          path: publish/arm64-ocr-validation/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  publish:
+    needs: [build, arm-smoke]
+    if: needs.build.result == 'success' && needs['arm-smoke'].result == 'success' && (startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download the validated ARM64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: STranslate-arm64-${{ needs.build.outputs.version }}
+          path: publish/arm64
+      - name: Download the ARM64 execution report
+        uses: actions/download-artifact@v4
+        with:
+          name: STranslate-arm64-ocr-validation-${{ needs.build.outputs.version }}
+          path: publish/arm64-ocr-validation
+      - name: Require successful execution of this exact ARM64 package
+        shell: pwsh
+        env:
+          ARM64_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          $reportPath = 'publish/arm64-ocr-validation/arm64-ocr-validation.json'
+          $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+          $fullPackage = "publish/arm64/STranslate-ARM64-$env:ARM64_VERSION-win-arm64-full.nupkg"
+          if (-not $report.Success -or $report.ProcessArchitecture -ne 'Arm64' -or $report.OSArchitecture -ne 'Arm64' -or
+              $report.Version -ne $env:ARM64_VERSION -or $report.SourceCommit -ne $env:GITHUB_SHA -or
+              [string]$report.WorkflowRunId -ne [string]$env:GITHUB_RUN_ID -or
+              $report.FullPackageSHA256 -ne (Get-FileHash $fullPackage -Algorithm SHA256).Hash) {
+            throw '真实 ARM64 OCR 报告缺失、失败或不属于本次安装包，禁止发布。'
+          }
+          Copy-Item $reportPath 'publish/arm64/arm64-ocr-validation.json'
+          ./scripts/Test-Arm64Artifacts.ps1 -ReleaseDirectory ./publish/arm64 -Version $env:ARM64_VERSION
+          Get-ChildItem 'publish/arm64' -File | Where-Object Name -NE 'SHA256SUMS.txt' | Sort-Object Name | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)"
+          } | Set-Content 'publish/arm64/SHA256SUMS.txt' -Encoding utf8
       - name: Upload complete ARM64 Release as draft
-        if: startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.build.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: STranslate ARM64 ${{ steps.version.outputs.version }}
+          name: STranslate ARM64 ${{ needs.build.outputs.version }}
           body_path: ARM64-RELEASE.md
           draft: true
           prerelease: false
@@ -142,11 +221,10 @@ jobs:
           fail_on_unmatched_files: true
           files: publish/arm64/*
       - name: Publish complete ARM64 Release
-        if: startsWith(github.ref, 'refs/tags/arm64-v') || inputs.publish == true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          ARM64_TAG: ${{ steps.version.outputs.tag }}
+          ARM64_TAG: ${{ needs.build.outputs.tag }}
         run: |
           gh release edit $env:ARM64_TAG --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'ARM64 资源已经上传为草稿，但正式发布失败。' }

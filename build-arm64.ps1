@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '2.0.10-arm64.1',
+    [string]$Version = '2.0.10-arm64.4',
     [string]$OutputDirectory = 'publish/arm64',
     [switch]$DownloadPrevious
 )
@@ -89,6 +89,13 @@ try {
         Get-ChildItem $destination -Recurse -File | Where-Object Name -In @('STranslate.Plugin.dll', 'STranslate.Plugin.xml') | Remove-Item -Force
     }
 
+    # ARM64 专属插件不加入上游 solution，也不放进其原有插件遍历目录。
+    $ocrProject = 'src/Arm64/Plugins/STranslate.Plugin.Ocr.PaddleV6Arm64/STranslate.Plugin.Ocr.PaddleV6Arm64.csproj'
+    $ocrDirectory = Join-Path $appDirectory 'Plugins/STranslate.Plugin.Ocr.PaddleV6Arm64'
+    Invoke-Checked 'dotnet' (@('publish', $ocrProject, '-c', 'Release', '-r', 'win-arm64', '--self-contained', 'false', '-o', $ocrDirectory, '-p:UseAppHost=false') + $buildProperties)
+    Get-ChildItem $ocrDirectory -Recurse -File | Where-Object Name -In @('STranslate.Plugin.dll', 'STranslate.Plugin.xml') | Remove-Item -Force
+    & './scripts/Prepare-PaddleOcrArm64.ps1' -AppDirectory $appDirectory
+
     & './scripts/Test-Arm64Artifacts.ps1' -AppDirectory $appDirectory -Version $cleanVersion
     if ($DownloadPrevious) {
         $previousPath = Join-Path $workDirectory 'previous'
@@ -124,6 +131,7 @@ try {
 
     # 保留至多一个上一版 full，确保 vpk 写入的 feed 中每个包都有对应文件；
     # 不使用上游按下载前后文件名删除的方式，以免删除本次 metadata。
+    Copy-Item (Join-Path $appDirectory 'arm64-ocr-provenance.json') $outputPath
     & './scripts/Test-Arm64Artifacts.ps1' -AppDirectory $appDirectory -ReleaseDirectory $outputPath -Version $cleanVersion
     $deltaPackage = Join-Path $outputPath "$packageId-$cleanVersion-win-arm64-delta.nupkg"
     if (Test-Path $deltaPackage) {

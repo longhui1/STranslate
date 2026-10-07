@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <OutputPath>..\..\..\.artifacts\$(Configuration)\Plugins\$(AssemblyName)\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 禁用包自带的 v5 模型复制；模型只通过校验后在线下载。 -->
+    <PackageReference Include="RapidOcrNet" Version="4.2.0" ExcludeAssets="build;buildTransitive;contentFiles" />
+    <!-- ORT 的 AnyCPU build props 会复制 x64 DLL；使用 RID 原生资产选择。 -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" ExcludeAssets="build;buildTransitive" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <ProjectReference Include="..\..\..\STranslate.Plugin\STranslate.Plugin.csproj"
+                      GlobalPropertiesToRemove="Version;VersionPrefix;VersionSuffix;PackageVersion" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="plugin.json;icon.png;model-manifest.json;LICENSE-RapidOcrNet.txt;NOTICE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+  <Target Name="RemoveHostAssemblies" AfterTargets="Build">
+    <ItemGroup>
+      <HostAssemblies Include="$(OutputPath)STranslate.Plugin.dll;$(OutputPath)CommunityToolkit.Mvvm.dll;$(OutputPath)iNKORE.UI.WPF*.dll;$(OutputPath)Microsoft.Extensions*.dll" />
+    </ItemGroup>
+    <Delete Files="@(HostAssemblies)" />
+  </Target>
+</Project>

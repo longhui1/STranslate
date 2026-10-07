@@ -58,6 +58,7 @@ public class Constant
         "64f812516673408ab5b59e56720bd641", //BaiduOCR
         "8eb80c0391314256a4058b464d77946a", //OpenAIOCR
         "3410e7de989340938301abd6fcf8cc4b", //WeChatOCRBuiltIn
+        "c67c0e3de45b48f6a852ffa8f0aae2f2", //PaddleOCR V6 ARM64
         "2e83ee2f5dbf45249a3bd1457a326abf", //GoogleOCR
         "bb65c593ebb04d40bc2c5ad55aecc4e2", //TencentOCR
         "f0c68321faf24e058be2b2e2ed26f90d", //YoudaoOCR

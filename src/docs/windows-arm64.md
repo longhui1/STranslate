@@ -2,16 +2,16 @@
 
 ## 第一阶段范围
 
-ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack OTA。目标是可安装、可持续升级的发行版，而不只是改变主程序的 RID。内置 DeepL API 与纯 .NET 社区 MiMo TTS 原包保持现有接口；微信内置 OCR 在发布和运行时排除；PaddleOCR / PP-OCRv6 不作为第一阶段交付条件。
+ARM64 版本复用上游 WPF 主程序、Rust helper、插件 SDK 和 Velopack OTA。目标是可安装、可持续升级的发行版，而不只是改变主程序的 RID。内置 DeepL API 与纯 .NET 社区 MiMo TTS 原包保持现有接口；微信内置 OCR 在发布和运行时排除；PaddleOCR / PP-OCRv6 不作为第一阶段交付条件。`arm64.4` 起新增独立内置 PaddleOCR V6 (ARM64)，使用原生 CPU 推理与在线下载的 Small 模型，详见 [PaddleOCR ARM64 维护文档](windows-arm64-paddleocr.md)。
 
 源码基线是此 fork 的提交 `75f616a257bcf34d78d8929152fb579886d1d8e5`，保留 fork 已有功能。上游最近正式发行版为 `v2.0.10`。初始包版本使用 `2.0.10-arm64.1`，ARM64 修订递增后缀为 `2.0.10-arm64.2`；同步新版上游后使用例如 `2.0.11-arm64.1`。`vpk 1.2.0` 与原生更新组件要求标准三段 SemVer，不能使用四段 `packVersion`。采用这个后缀无需修改打包工具；正式 GitHub Release 的 `prerelease=false`，仍由稳定更新源读取。应用的数字程序集 / 文件版本分别对应 `2.0.10.1`、`2.0.10.2`，信息版本保留完整包版本；OTA 始终以 Velopack 安装版本比较，不能用数字程序集版本与包版本混比。
 
 ## 第一阶段下载与实机 OTA
 
-- 直接使用：[最新 ARM64 Setup（2.0.10-arm64.3）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.3/STranslate-ARM64-win-arm64-Setup.exe)。
-- 完整资产、更新元数据和校验文件：[ARM64 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.3)。
+- 直接使用：[最新 ARM64 Setup（2.0.10-arm64.4）](https://github.com/longhui1/STranslate/releases/download/arm64-v2.0.10-arm64.4/STranslate-ARM64-win-arm64-Setup.exe)。
+- 完整资产、更新元数据和校验文件：[ARM64 Release](https://github.com/longhui1/STranslate/releases/tag/arm64-v2.0.10-arm64.4)。
 - `arm64.1` / `arm64.2` 的更新检查使用匿名 GitHub API。实机已报告 `403 rate limit exceeded`，发生在发现新版本之前。如果旧版仍被限额阻断，先退出程序并运行本版 Setup 覆盖安装一次；`arm64.3` 起检查与下载不再调用 GitHub Release API，无需个人 token。安装身份、目录和配置路径不变，设备上需确认数据保留。
-- 测试后续 OTA：保留安装 `arm64.3` 的设备，配置 DeepL / MiMo 并产生历史记录，从关于页面更新到下一次更高版本，确认退出、替换、重启和数据保留。旧版 API 恢复后也可升级到本版；不能要求仍被限流的旧检查器自行修复。
+- 测试 OTA：保留安装 `arm64.3` 的设备，配置 DeepL / MiMo 并产生历史记录，从关于页面更新到 `arm64.4`，确认退出、替换、重启和数据保留，并能添加新的内置 ARM64 OCR 服务。旧版 API 恢复后也可升级到本版；不能要求仍被限流的旧检查器自行修复。
 
 安装包未代码签名，Windows 可能提示发布者未知。运行和功能验证清单见本文末尾；云端的构建与包校验不能代替这些设备验证。
 
@@ -46,7 +46,7 @@ ARM64 从 `arm64.3` 起复用 Velopack `SimpleWebSource` 读取 latest 正式 Re
 脚本以失败即停止的方式完成以下工作：
 
 1. 从原有 `Cargo.lock` 编译 `z_stranslate_host` 的 `aarch64-pc-windows-msvc` 目标，使用静态 CRT，避免安装后缺少 ARM64 VC Redist。
-2. 对主程序自包含发布，所有内置插件单独发布并合并到 `Plugins`，排除微信 OCR。插件仍为 AnyCPU，由 ARM64 CLR 执行。
+2. 对主程序自包含发布，原有内置插件与 `src/Arm64/Plugins` 下显式选定的 ARM64 OCR 插件分别发布并合并到 `Plugins`，排除微信 OCR。插件仍为 AnyCPU，由 ARM64 CLR 执行；OCR native 资产按 RID 选择 ARM64，所需 ARM64 CRT 随包提供，模型不打包。
 3. ARM64 构建禁用 Costura，保留标准 .NET 发布目录和依赖，避免嵌入器的 native / runtime 处理影响 ARM64 加载；不更改上游 x64 打包策略。
 4. 使用与应用 `Velopack 1.2.0` 一致的 `vpk 1.2.0` 和 ARM64 Setup / update / stub 组件打包。
 5. 检查原生 PE、AnyCPU CLR 标志、Setup、全量包、便携包以及 feed 引用文件与哈希，检查通过后才允许发布。
@@ -57,7 +57,7 @@ Velopack 1.2.0 的工具包默认 vendor helpers 不是 ARM64，仅传 `--runtim
 
 ## GitHub Actions 发布
 
-独立 workflow 位于 `.github/workflows/arm64.yml`。Windows runner 负责完整原生构建与打包；分支 / PR 校验产物以 workflow artifact 提供，`arm64-v*` tag 发布为 GitHub Release。正式发布串行执行，先检查所有已发布 ARM64 tag / feed 的版本，拒绝覆写已发布版本，再将完整资产上传至 draft，成功后正式发布。原 x64 workflow 跳过 ARM64 tag，避免同一标签混入官方架构。
+独立 workflow 位于 `.github/workflows/arm64.yml`。Windows x64 runner 负责完整原生交叉构建与打包；Windows ARM64 runner 从实际完整包加载新增 OCR 插件，在线下载模型并执行识别验证；只有二者成功后发布。分支 / PR 校验产物以 workflow artifact 提供，`arm64-v*` tag 发布为 GitHub Release。正式发布串行执行，先检查所有已发布 ARM64 tag / feed 的版本，拒绝覆写已发布版本，再将完整资产上传至 draft，成功后正式发布。原 x64 workflow 跳过 ARM64 tag，避免同一标签混入官方架构。
 
 构建仓库需要 Actions 已启用，并允许 workflow 的 `GITHUB_TOKEN` 写入 Contents。推送 workflow 文件的连接还需要对应的 Workflows 权限。运行成功后应同时发布：
 
@@ -89,11 +89,13 @@ git push origin arm64-v2.0.11-arm64.1
 | 主 csproj 条件 RID 和 helper 路径 | 默认 x64 保留；ARM64 构建从 Rust target 目录取 helper，不拷贝 Resources 中的 x64 EXE |
 | `UpdateFeedPolicy` 和更新服务 | 按 ARM64 进程固定 fork / channel；公开 latest feed 绕开匿名 API 限额，包下载固定版本 tag；版本比较以 Velopack 安装版本为准 |
 | 更新日志对话框的可选发行说明 | ARM64 展示同一包的日志；x64 继续使用原日志地址 |
-| `PluginManager` 微信稳定 ID 拒绝规则 | 避免旧配置 / 本地导入重新加载已知不兼容的 native 插件 |
+| `PluginManager` 已知不兼容 ID 拒绝规则 | ARM64 拒绝微信 OCR 和两个社区 x64 PaddleOCR 包；引导使用独立 ID 的内置 ARM64 OCR，防止市场 x64 更新覆盖 |
+| About 的架构相关链接 | ARM64 指向本 fork 的项目、问题和 Release；移除捐赠入口，保留上游版权和第三方致谢 |
+| `src/Arm64/Plugins`、native 准备与 ARM64 OCR smoke | 小型 SDK 适配层，固定官方 ARM64 库与在线模型哈希，避免维护 OCR 算法 fork；ARM64 实际运行通过才发布 |
 | 独立 ARM64 构建、验证脚本和 workflow | 与上游 x64 脚本隔离，锁定工具、源码和渠道；原 workflow 只增加 ARM64 事件隔离 |
 | 更新 / 插件策略回归测试 | 检查 API 403 时 ARM64 零 API 调用、无 x64 回退、固定 tag 下载、取消 / 进度传递、版本递增与 MiMo 允许加载；x64 原更新行为保持 |
 
-无需修改 DeepL、MiMo、ScreenGrab、NAudio 或 Rust helper 的功能源码。详细证据见 [插件审计](arm64-plugin-compatibility.md) 和 [原生依赖审计](arm64-native-dependencies.md)。同步上游后保留这几个小型补丁，重新运行 workflow；若上游调整插件 manifest / SDK、native 依赖、helper 命令或 Velopack，应重新审核对应边界。
+无需修改 DeepL、MiMo、ScreenGrab、NAudio 或 Rust helper 的功能源码。新增 OCR 项目不进入上游 x64 solution / 插件遍历目录，便于继续合并上游。详细证据见 [插件审计](arm64-plugin-compatibility.md) 和 [原生依赖审计](arm64-native-dependencies.md)。同步上游后保留这几个小型补丁，重新运行 workflow；若上游调整插件 manifest / SDK、native 依赖、helper 命令或 Velopack，应重新审核对应边界。
 
 当前 NuGet restore 对上游传递依赖 `SQLitePCLRaw.lib.e_sqlite3 2.1.11` 报告 `NU1903 / GHSA-2m69-gcr7-jv3q`。此阶段保持上游依赖以限制差异；这是现有依赖维护事项，应随上游安全更新处理，不应误写为 ARM64 专有兼容性问题。
 

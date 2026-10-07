@@ -1,0 +1,28 @@
+[
+  {
+    "FileName": "chinese.png",
+    "Text": "中文翻译测试",
+    "Width": 1024,
+    "Height": 300,
+    "Bounds": [
+      190,
+      110,
+      598,
+      175
+    ],
+    "SHA256": "95901D5EE6468D103A2C48A8210667A0CF180C9EA1871DE4DAB8556A30F2E23A"
+  },
+  {
+    "FileName": "english.png",
+    "Text": "Windows ARM64 OCR",
+    "Width": 1280,
+    "Height": 300,
+    "Bounds": [
+      170,
+      114,
+      822,
+      168
+    ],
+    "SHA256": "E92E863822D1A5F86A63D2139F735FA1DD6B42C1505B5F08DDC5956410B1349C"
+  }
+]

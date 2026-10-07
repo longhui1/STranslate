@@ -35,6 +35,7 @@
 | 插件SDK开发 | [docs/plugin-sdk-development.md](docs/plugin-sdk-development.md) | SDK接口、插件生命周期、`plugin.json` 规范、官方实现范式 |
 | 社区插件开发 | [docs/community-plugin-development.md](docs/community-plugin-development.md) | 社区插件本地开发、断点调试、`.spkg` 打包导入、日志与排障 |
 | Windows ARM64 发布维护 | [docs/windows-arm64.md](docs/windows-arm64.md) | 独立 ARM64 更新源、Setup、可重复构建发布与上游同步 |
+| Windows ARM64 PaddleOCR | [docs/windows-arm64-paddleocr.md](docs/windows-arm64-paddleocr.md) | 内置 PP-OCRv6、在线模型、原生运行库与 ARM64 运行验证 |
 | Windows ARM64 插件兼容性 | [docs/arm64-plugin-compatibility.md](docs/arm64-plugin-compatibility.md) | DeepL、MiMo 原始包审计、微信 OCR 禁用与实机验证 |
 | Windows ARM64 原生依赖 | [docs/arm64-native-dependencies.md](docs/arm64-native-dependencies.md) | 辅助程序、SQLite、截图、音频、通知与系统接口 |
 | 国际化与语言贡献 | [docs/i18n-internationalization.md](docs/i18n-internationalization.md) | 多语言机制、新增语言 Checklist、资源字典/插件翻译规范 |

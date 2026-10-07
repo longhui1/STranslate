@@ -23,10 +23,21 @@ public partial class AboutViewModel(
     BackupService backupService) : ObservableObject
 {
     private const int PortableModeOperationDelaySeconds = 3;
+    private readonly UpdateFeedPolicy _aboutFeed = UpdateFeedPolicy.Current;
 
     public Settings Settings { get; } = settings;
     public DataProvider DataProvider { get; } = dataProvider;
     public bool IsPortableMode => DataLocation.PortableDataLocationInUse();
+    public bool IsArm64Version => _aboutFeed.Channel == UpdateFeedPolicy.Arm64Channel;
+    public string ApplicationName => IsArm64Version ? $"{Constant.AppName} ARM64" : Constant.AppName;
+    public string Attribution => IsArm64Version
+        ? $"Windows ARM64 fork: {MaintainerName}\n© 2020 zggsong & STranslate Contributors"
+        : "© 2020 zggsong & STranslate Contributors";
+    public Uri ProjectUri => new(_aboutFeed.RepositoryUrl);
+    public Uri IssueUri => IsArm64Version ? new($"{_aboutFeed.RepositoryUrl}/issues") : Constant.ReportUri;
+    public Uri ReleaseNotesUri => new(_aboutFeed.ReleaseNotesUrl ?? $"{_aboutFeed.RepositoryUrl}/releases");
+    public string MaintainerName => ProjectUri.Segments[1].Trim('/');
+    public Uri MaintainerUri => new($"{ProjectUri.GetLeftPart(UriPartial.Authority)}/{MaintainerName}");
     public string Version => Constant.Version switch
     {
         "1.0.0" => Constant.Dev,
@@ -45,9 +56,6 @@ public partial class AboutViewModel(
         }
         await updaterService.UpdateAppAsync();
     }
-
-    [RelayCommand]
-    private void Donate() => Process.Start(new ProcessStartInfo(Constant.Sponsor) { UseShellExecute = true });
 
     [RelayCommand]
     private async Task OpenWizardAsync()

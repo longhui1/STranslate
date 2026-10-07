@@ -1,0 +1,10 @@
+{
+  "PluginID": "c67c0e3de45b48f6a852ffa8f0aae2f2",
+  "Name": "PaddleOCR V6 (ARM64)",
+  "Description": "原生 Windows ARM64 本地 PP-OCRv6 Small，首次使用自动下载模型，无需 API 密钥。",
+  "Author": "STranslate ARM64 contributors",
+  "Version": "1.0.0",
+  "Website": "https://github.com/longhui1/STranslate",
+  "ExecuteFileName": "STranslate.Plugin.Ocr.PaddleV6Arm64.dll",
+  "IconPath": "icon.png"
+}
